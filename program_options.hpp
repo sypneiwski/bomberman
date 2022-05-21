@@ -1,16 +1,17 @@
-#ifndef PROGRAM_OPTIONS_H
-#define PROGRAM_OPTIONS_H
+#ifndef PROGRAM_OPTIONS_HPP
+#define PROGRAM_OPTIONS_HPP
 #include <string>
 
 namespace options {
 	struct Options {
-		std::string gui_address;
-		std::string player_name;
+		std::string gui_address,
+					gui_port,
+					player_name,
+					server_address,
+					server_port;
 		uint16_t port;
-		std::string server_address;
+		Options(int, char*[]);
 	};
-
-	Options get_client_options(int, char*[]);
 }
 
-#endif // PROGRAM_OPTIONS_H
+#endif // PROGRAM_OPTIONS_HPP

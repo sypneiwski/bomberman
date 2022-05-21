@@ -1,5 +1,5 @@
-#ifndef MESSAGES_H
-#define MESSAGES_H
+#ifndef MESSAGES_HPP
+#define MESSAGES_HPP
 #include <variant>
 #include <string>
 #include <vector>
@@ -16,6 +16,7 @@ namespace messages {
 	private:
 		uint16_t x, y;
 	public:
+		Position() : x(0), y(0) {};
 		Position(uint16_t, uint16_t);
 		Position(const char*, size_t);
 		uint32_t encode(char*) const;
@@ -40,6 +41,12 @@ namespace messages {
 		Bomb(Position, uint16_t);
 		Bomb(const char*, size_t);
 		uint32_t encode(char*) const;
+	};
+
+	// is this needed?
+	class EmptyMessage {
+	public:
+		EmptyMessage() = default;
 	};
 
 	enum struct ClientMessageType : uint8_t {
@@ -123,7 +130,8 @@ namespace messages {
 		using EventVariant = std::variant<BombPlacedMessage,
 										  BombExplodedMessage,
 										  PlayerMovedMessage,
-										  BlockPlacedMessage>;
+										  BlockPlacedMessage,
+										  EmptyMessage>; //needed?
 		EventType type;
 		EventVariant event_variant;
 	public:
@@ -170,4 +178,4 @@ namespace messages {
 	};
 }
 
-#endif // MESSAGES_H
+#endif // MESSAGES_HPP
