@@ -4,80 +4,157 @@
 #include <endian.h>
 #include <iostream> // debug
 #include "messages.hpp"
+#include "buffer_wrapper.hpp"
 
 namespace messages {
-	Position::Position(const char* buffer, size_t size) {
-		if (size < 4)
+	template<typename T>
+	void read_list(std::vector<T> &vec, buffers::Buffer &buffer) {
+		try {
+			uint32_t len = buffer.read32();
+			for (uint32_t i = 0; i < len; i++) {
+				T elem = T(buffer);
+				vec.push_back(elem);
+			}
+		}
+		catch (std::exception &e) {
 			throw DeserializingError();
-		x = be16toh(*(uint16_t*) buffer);
-		y = be16toh(*(uint16_t*) (buffer + 2));
-		std::cout << "x: " << x << " y: " << y << "\n";
-	}
-
-	BombPlacedMessage::BombPlacedMessage(const char* buffer, size_t size, size_t* event_size) {
-		if (size < 8)
-			throw DeserializingError();
-		id = Bomb::BombId(be32toh(*(uint32_t*) buffer));
-		std::cout << "BombId: " << id << "\n";
-		position = Position(buffer + 4, size - 4);
-		*event_size += 8;
-	}
-
-	PlayerMovedMessage::PlayerMovedMessage(const char* buffer, size_t size, size_t* event_size) {
-		if (size < 5)
-			throw DeserializingError();
-		id = Player::PlayerId(*(uint8_t*) buffer);
-		std::cout << "PlayerId: " << (int)id << "\n";
-		position = Position(buffer + 1, size - 1);
-		*event_size += 5;
-	}
-
-	Event::Event(const char* buffer, size_t size, size_t* event_size) : event_variant(EmptyMessage()) {
-		if (size < 2)
-			throw DeserializingError();
-		type = EventType(*buffer);
-		*event_size += 1;
-		switch (type) {
-			case EventType::BombPlaced:
-				std::cout << "BombPlaced:\n";
-				event_variant = BombPlacedMessage(buffer + 1, size - 1, event_size);
-				break;
-			case EventType::PlayerMoved:
-				std::cout << "PlayerMoved:\n";
-				event_variant = PlayerMovedMessage(buffer + 1, size - 1, event_size);
-				break;
-			default:
-				break;
 		}
 	}
 
-	TurnMessage::TurnMessage(const char* buffer, size_t size) {
-		if (size < 2)
+	Position::Position(buffers::Buffer &buffer) {
+		try {
+			x = buffer.read16();
+			y = buffer.read16();
+			std::cout << "x: " << x << " y: " << y << "\n";
+		}
+		catch (std::exception &e) {
 			throw DeserializingError();
-		turn = be16toh(*(uint16_t*) buffer);
-		std::cout << "turn : " << turn << "\n";
-		uint32_t len = be32toh(*(uint32_t*) (buffer + 2));
-		size_t read_bytes = 6, event_size;
-		for(uint32_t i = 0; i < len; i++) {
-			if (read_bytes >= size)
-				throw DeserializingError();
-			event_size = 0;
-			Event event = Event(buffer + read_bytes, size - read_bytes, &event_size);
-			events.push_back(event);
-			read_bytes += event_size;
 		}
 	}
 
-	ServerMessage::ServerMessage(const char* buffer, size_t size) {
-		if (size < 2)
+	MoveMessage::MoveMessage(buffers::Buffer &buffer) {
+		try {
+			direction = Direction(buffer.read8());
+		}
+		catch (std::exception &e) {
 			throw DeserializingError();
-		type = ServerMessageType(*buffer);
-		switch (type) {
-			case ServerMessageType::Turn:
-				message_variant = TurnMessage(buffer + 1, size - 1);
-				break;
-			default:
-				break;
+		}
+	}
+
+	BombPlacedMessage::BombPlacedMessage(buffers::Buffer &buffer) {
+		try {
+			id = Bomb::BombId(buffer.read32());
+			std::cout << "BombId: " << id << "\n";
+			position = Position(buffer);
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
+		}
+	}
+
+	PlayerMovedMessage::PlayerMovedMessage(buffers::Buffer &buffer) {
+		try {
+			id = Player::PlayerId(buffer.read8());
+			std::cout << "PlayerId: " << (int) id << "\n";
+			position = Position(buffer);
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
+		}
+	}
+
+	Event::Event(buffers::Buffer &buffer) : event_variant(EmptyMessage()) {
+		try {
+			type = EventType(buffer.read8());
+			switch (type) {
+				case EventType::BombPlaced:
+					std::cout << "BombPlaced:\n";
+					event_variant = BombPlacedMessage(buffer);
+					break;
+				case EventType::PlayerMoved:
+					std::cout << "PlayerMoved:\n";
+					event_variant = PlayerMovedMessage(buffer);
+					break;
+				default:
+					throw DeserializingError();
+			}
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
+		}
+	}
+
+	HelloMessage::HelloMessage(buffers::Buffer &buffer) {
+		try {
+			uint8_t len = buffer.read8();
+			buffer.read_string(&server_name, len);
+			players_count = buffer.read8();
+			size_x = buffer.read16();
+			size_y = buffer.read16();
+			game_length = buffer.read16();
+			explosion_radius = buffer.read16();
+			bomb_timer = buffer.read16();
+
+			std::cout << server_name << "\n"
+			          << (int)players_count << "\n"
+			          << size_x << " " << size_y << "\n"
+			          << game_length << "\n"
+			          << explosion_radius << " " << bomb_timer << "\n";
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
+		}
+	}
+
+	TurnMessage::TurnMessage(buffers::Buffer &buffer) {
+		try {
+			turn = buffer.read16();
+			std::cout << "turn : " << turn << "\n";
+			read_list(events, buffer);
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
+		}
+	}
+
+	ServerToClient::ServerToClient(buffers::Buffer &buffer) : message_variant(EmptyMessage()){
+		try {
+			type = ServerToClientType(buffer.read8());
+			switch (type) {
+				case ServerToClientType::Hello:
+					message_variant = HelloMessage(buffer);
+					break;
+				case ServerToClientType::Turn:
+					message_variant = TurnMessage(buffer);
+					break;
+				default:
+					throw DeserializingError();
+			}
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
+		}
+	}
+
+	GUIToClient::GUIToClient(buffers::Buffer &buffer) {
+		try {
+			type = GUIToClientType(buffer.read8());
+			switch (type) {
+				case GUIToClientType::PlaceBomb:
+					message_variant = PlaceBombMessage();
+					break;
+				case GUIToClientType::PlaceBlock:
+					message_variant = PlaceBlockMessage();
+					break;
+				case GUIToClientType::Move:
+					message_variant = MoveMessage(buffer);
+					break;
+				default:
+					throw DeserializingError();
+			}
+		}
+		catch (std::exception &e) {
+			throw DeserializingError();
 		}
 	}
 }
