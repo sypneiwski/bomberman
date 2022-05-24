@@ -7,28 +7,26 @@
 #include <boost/asio.hpp>
 #include <endian.h>
 #include "program_options.hpp"
+#include "buffer_wrapper.hpp"
 
 //todo namespace
 
 class GUIConnection {
 public:
-	GUIConnection(boost::asio::io_context &io_context, options::Options &options) :
-			socket(io_context, udp::endpoint(udp::v4(), options.port)) {
-	}
+	GUIConnection(boost::asio::io_context&, options::Options&);
+
+	void write(buffers::Buffer&);
 
 private:
 	using udp = boost::asio::ip::udp;
 	udp::socket socket;
+	udp::endpoint endpoint;
+	static constexpr size_t MAX_UDP = 65535;
+	char data[MAX_UDP];
+	char *ptr;
 };
 
 class ServerConnection {
-private:
-	using tcp = boost::asio::ip::tcp;
-	tcp::socket socket;
-
-	template<typename T>
-	T read();
-
 public:
 	ServerConnection(boost::asio::io_context&, options::Options&);
 
@@ -39,6 +37,13 @@ public:
 	uint32_t read32();
 
 	void read_string(std::string*, size_t);
+
+private:
+	using tcp = boost::asio::ip::tcp;
+	tcp::socket socket;
+
+	template<typename T>
+	T read();
 };
 
 #endif // CONNECTIONS_HPP

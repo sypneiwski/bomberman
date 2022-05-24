@@ -10,8 +10,20 @@
 
 
 void worker(ServerConnection *conn) {
+	using namespace messages;
+	ServerToClient hello(conn);
+	// assert type == hello
+	HelloMessage tmp = std::get<HelloMessage>(hello.data);
+	ClientToGUI lobby(ClientToGUIType::Lobby, LobbyMessage(
+			tmp.server_name,
+			tmp.players_count,
+			tmp.size_x, tmp.size_y,
+			tmp.game_length,
+			tmp.explosion_radius, tmp.bomb_timer,
+			{}
+			));
 	for (;;) {
-		messages::ServerToClient m(conn);
+		ServerToClient m(conn);
 	}
 }
 
@@ -38,13 +50,15 @@ int main(int argc, char *argv[]) {
 	}
 	*/
 
-	buffers::Buffer buffer();
-
 	try {
 		boost::asio::io_context io_context;
-		ServerConnection conn(io_context, options);
-		boost::thread t(boost::bind(&worker, &conn));
-		t.join();
+		ServerConnection serv_conn(io_context, options);
+		GUIConnection gui_conn(io_context, options);
+		//boost::thread t(boost::bind(&worker, &conn));
+		//t.join();
+		buffers::Buffer buffer;
+		buffer.write_string("skdjfnskdjfn");
+		gui_conn.write(buffer);
 	}
 	catch (std::exception &e) {
 		std::cerr << "ERROR: " << e.what() << std::endl;

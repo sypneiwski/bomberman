@@ -47,7 +47,7 @@ namespace buffers {
 		return data;
 	}
 
-	void Buffer::reset() {
+	void Buffer::clear() {
 		ptr = data;
 	}
 }

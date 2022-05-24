@@ -27,7 +27,7 @@ namespace buffers {
 
 		char* get_data();
 
-		void reset();
+		void clear();
 
 	private:
 		char data[BUFFER_SIZE];

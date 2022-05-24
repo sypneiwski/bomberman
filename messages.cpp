@@ -22,16 +22,6 @@ namespace messages {
 		}
 	}
 
-	template<typename K, typename V>
-	void serialize_map(std::unordered_map<K, V> &map, buffers::Buffer& buff) {
-		uint32_t size = map.size();
-		buff.write32(size);
-		for (auto& [key, value]: map) {
-			key.serialize(buff);
-			value.serialize(buff);
-		}
-	}
-
 	Position::Position(ServerConnection *conn) {
 		try {
 			x = conn->read16();
@@ -41,6 +31,13 @@ namespace messages {
 		catch (std::exception &e) {
 			throw DeserializingError();
 		}
+	}
+
+	void Player::serialize(buffers::Buffer& buff) const {
+		buff.write8(name.size())
+			.write_string(name)
+			.write8(address.size())
+			.write_string(address);
 	}
 
 	MoveMessage::MoveMessage(ServerConnection *conn) {
@@ -182,14 +179,26 @@ namespace messages {
 			.write16(game_length)
 			.write16(explosion_radius)
 			.write16(bomb_timer);
-		serialize_map<Player::PlayerId, Player>(players, buff);
+		uint32_t size = players.size();
+		buff.write32(size);
+		for (auto& [key, value]: players) {
+			buff.write8(static_cast<uint8_t>(key));
+			value.serialize(buff);
+		}
 	}
 
 	ClientToGUI::ClientToGUI(ClientToGUIType type, ClientToGUIVariant data)
 	: type(type), data(data) {}
 
 	void ClientToGUI::serialize(buffers::Buffer &buff) const {
-		buff.write8(type);
-		data.serialize(buff);
+		buff.write8(static_cast<uint8_t>(type));
+		switch(type) {
+			case ClientToGUIType::Lobby:
+				std::get<LobbyMessage>(data).serialize(buff);
+				break;
+			case ClientToGUIType::Game:
+				//std::get<GameMessage>(data).serialize(buff);
+				break;
+		}
 	}
 }
