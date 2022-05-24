@@ -4,15 +4,16 @@
 #include <endian.h>
 #include <iostream> // debug
 #include "messages.hpp"
+#include "connections.hpp"
 #include "buffer_wrapper.hpp"
 
 namespace messages {
 	template<typename T>
-	void read_list(std::vector<T> &vec, buffers::Buffer &buffer) {
+	void read_list(std::vector<T> &vec, ServerConnection *conn) {
 		try {
-			uint32_t len = buffer.read32();
+			uint32_t len = conn->read32();
 			for (uint32_t i = 0; i < len; i++) {
-				T elem = T(buffer);
+				T elem = T(conn);
 				vec.push_back(elem);
 			}
 		}
@@ -21,10 +22,20 @@ namespace messages {
 		}
 	}
 
-	Position::Position(buffers::Buffer &buffer) {
+	template<typename K, typename V>
+	void serialize_map(std::unordered_map<K, V> &map, buffers::Buffer& buff) {
+		uint32_t size = map.size();
+		buff.write32(size);
+		for (auto& [key, value]: map) {
+			key.serialize(buff);
+			value.serialize(buff);
+		}
+	}
+
+	Position::Position(ServerConnection *conn) {
 		try {
-			x = buffer.read16();
-			y = buffer.read16();
+			x = conn->read16();
+			y = conn->read16();
 			std::cout << "x: " << x << " y: " << y << "\n";
 		}
 		catch (std::exception &e) {
@@ -32,48 +43,48 @@ namespace messages {
 		}
 	}
 
-	MoveMessage::MoveMessage(buffers::Buffer &buffer) {
+	MoveMessage::MoveMessage(ServerConnection *conn) {
 		try {
-			direction = Direction(buffer.read8());
+			direction = Direction(conn->read8());
 		}
 		catch (std::exception &e) {
 			throw DeserializingError();
 		}
 	}
 
-	BombPlacedMessage::BombPlacedMessage(buffers::Buffer &buffer) {
+	BombPlacedMessage::BombPlacedMessage(ServerConnection *conn) {
 		try {
-			id = Bomb::BombId(buffer.read32());
+			id = Bomb::BombId(conn->read32());
 			std::cout << "BombId: " << id << "\n";
-			position = Position(buffer);
+			position = Position(conn);
 		}
 		catch (std::exception &e) {
 			throw DeserializingError();
 		}
 	}
 
-	PlayerMovedMessage::PlayerMovedMessage(buffers::Buffer &buffer) {
+	PlayerMovedMessage::PlayerMovedMessage(ServerConnection *conn) {
 		try {
-			id = Player::PlayerId(buffer.read8());
+			id = Player::PlayerId(conn->read8());
 			std::cout << "PlayerId: " << (int) id << "\n";
-			position = Position(buffer);
+			position = Position(conn);
 		}
 		catch (std::exception &e) {
 			throw DeserializingError();
 		}
 	}
 
-	Event::Event(buffers::Buffer &buffer) : event_variant(EmptyMessage()) {
+	Event::Event(ServerConnection *conn) : data(EmptyMessage()) {
 		try {
-			type = EventType(buffer.read8());
+			type = EventType(conn->read8());
 			switch (type) {
 				case EventType::BombPlaced:
 					std::cout << "BombPlaced:\n";
-					event_variant = BombPlacedMessage(buffer);
+					data = BombPlacedMessage(conn);
 					break;
 				case EventType::PlayerMoved:
 					std::cout << "PlayerMoved:\n";
-					event_variant = PlayerMovedMessage(buffer);
+					data = PlayerMovedMessage(conn);
 					break;
 				default:
 					throw DeserializingError();
@@ -84,16 +95,16 @@ namespace messages {
 		}
 	}
 
-	HelloMessage::HelloMessage(buffers::Buffer &buffer) {
+	HelloMessage::HelloMessage(ServerConnection *conn) {
 		try {
-			uint8_t len = buffer.read8();
-			buffer.read_string(&server_name, len);
-			players_count = buffer.read8();
-			size_x = buffer.read16();
-			size_y = buffer.read16();
-			game_length = buffer.read16();
-			explosion_radius = buffer.read16();
-			bomb_timer = buffer.read16();
+			uint8_t len = conn->read8();
+			conn->read_string(&server_name, len);
+			players_count = conn->read8();
+			size_x = conn->read16();
+			size_y = conn->read16();
+			game_length = conn->read16();
+			explosion_radius = conn->read16();
+			bomb_timer = conn->read16();
 
 			std::cout << server_name << "\n"
 			          << (int)players_count << "\n"
@@ -106,26 +117,26 @@ namespace messages {
 		}
 	}
 
-	TurnMessage::TurnMessage(buffers::Buffer &buffer) {
+	TurnMessage::TurnMessage(ServerConnection *conn) {
 		try {
-			turn = buffer.read16();
+			turn = conn->read16();
 			std::cout << "turn : " << turn << "\n";
-			read_list(events, buffer);
+			read_list(events, conn);
 		}
 		catch (std::exception &e) {
 			throw DeserializingError();
 		}
 	}
 
-	ServerToClient::ServerToClient(buffers::Buffer &buffer) : message_variant(EmptyMessage()){
+	ServerToClient::ServerToClient(ServerConnection *conn) : data(EmptyMessage()){
 		try {
-			type = ServerToClientType(buffer.read8());
+			type = ServerToClientType(conn->read8());
 			switch (type) {
 				case ServerToClientType::Hello:
-					message_variant = HelloMessage(buffer);
+					data = HelloMessage(conn);
 					break;
 				case ServerToClientType::Turn:
-					message_variant = TurnMessage(buffer);
+					data = TurnMessage(conn);
 					break;
 				default:
 					throw DeserializingError();
@@ -136,18 +147,18 @@ namespace messages {
 		}
 	}
 
-	GUIToClient::GUIToClient(buffers::Buffer &buffer) {
+	GUIToClient::GUIToClient(ServerConnection *conn) {
 		try {
-			type = GUIToClientType(buffer.read8());
+			type = GUIToClientType(conn->read8());
 			switch (type) {
 				case GUIToClientType::PlaceBomb:
-					message_variant = PlaceBombMessage();
+					data = PlaceBombMessage();
 					break;
 				case GUIToClientType::PlaceBlock:
-					message_variant = PlaceBlockMessage();
+					data = PlaceBlockMessage();
 					break;
 				case GUIToClientType::Move:
-					message_variant = MoveMessage(buffer);
+					data = MoveMessage(conn);
 					break;
 				default:
 					throw DeserializingError();
@@ -156,5 +167,29 @@ namespace messages {
 		catch (std::exception &e) {
 			throw DeserializingError();
 		}
+	}
+
+	LobbyMessage::LobbyMessage(std::string server, uint8_t count, uint16_t x, uint16_t y,
+							   uint16_t len, uint16_t ex, uint16_t timer, std::unordered_map<Player::PlayerId, Player> map)
+	: server_name(server), players_count(count), size_x(x), size_y(y), game_length(len), explosion_radius(ex),
+	bomb_timer(timer), players(map) {}
+
+	void LobbyMessage::serialize(buffers::Buffer &buff) const {
+		buff.write_string(server_name)
+			.write8(players_count)
+			.write16(size_x)
+			.write16(size_y)
+			.write16(game_length)
+			.write16(explosion_radius)
+			.write16(bomb_timer);
+		serialize_map<Player::PlayerId, Player>(players, buff);
+	}
+
+	ClientToGUI::ClientToGUI(ClientToGUIType type, ClientToGUIVariant data)
+	: type(type), data(data) {}
+
+	void ClientToGUI::serialize(buffers::Buffer &buff) const {
+		buff.write8(type);
+		data.serialize(buff);
 	}
 }

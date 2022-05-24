@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include <exception>
+#include <unordered_map>
+#include "connections.hpp"
 #include "buffer_wrapper.hpp"
 
 namespace messages {
@@ -17,40 +19,36 @@ namespace messages {
 		Up = 0, Right = 1, Down = 2, Left = 3
 	};
 
-	class Position {
-	private:
+	struct Position {
 		uint16_t x, y;
-	public:
+
 		Position() : x(0), y(0) {};
 		Position(uint16_t, uint16_t);
-		Position(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		Position(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class Player {
-	private:
-		std::string name, address;
-	public:
+	struct Player {
 		using PlayerId = uint8_t;
+		std::string name, address;
+
 		Player(std::string, std::string);
-		Player(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		Player(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class Bomb {
-	private:
+	struct Bomb {
+		using BombId = uint32_t;
 		Position position;
 		uint16_t timer;
-	public:
-		using BombId = uint32_t;
+
 		Bomb(Position, uint16_t);
-		Bomb(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		Bomb(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
 	// is this needed?
-	class EmptyMessage {
-	public:
+	struct EmptyMessage {
 		EmptyMessage() = default;
 	};
 
@@ -58,126 +56,115 @@ namespace messages {
 		Join = 0, PlaceBomb = 1, PlaceBlock = 2, Move = 3
 	};
 
-	class JoinMessage {
-	private:
+	struct JoinMessage {
 		std::string name;
-	public:
+	
 		JoinMessage(std::string);
-		JoinMessage(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		JoinMessage(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class PlaceBombMessage {
-	public:
+	struct PlaceBombMessage {
 		PlaceBombMessage() = default;
-		uint32_t serialize(buffers::Buffer&) const;
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class PlaceBlockMessage {
-	public:
+	struct PlaceBlockMessage {
 		PlaceBlockMessage() = default;
-		uint32_t serialize(buffers::Buffer&) const;
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class MoveMessage {
-	private:
+	struct MoveMessage {
 		Direction direction;
-	public:
+	
 		MoveMessage(std::string);
-		MoveMessage(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		MoveMessage(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class ClientToServer {
-	private:
+	struct ClientToServer {
 		using ClientToServerVariant = std::variant<JoinMessage,
 												  PlaceBombMessage,
 												  PlaceBlockMessage,
 												  MoveMessage>;
 		ClientToServerType type;
-		ClientToServerVariant message_variant;
-	public:
+		ClientToServerVariant data;
+	
 		ClientToServer(ClientToServerType, ClientToServerVariant);
-		ClientToServer(buffers::Buffer&);
-		uint32_t serialize(char *) const;
+		ClientToServer(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
 	enum struct EventType : uint8_t {
 		BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, BlockPlaced = 3
 	};
 
-	class BombPlacedMessage {
-	private:
+	struct BombPlacedMessage {
 		Bomb::BombId id;
 		Position position;
-	public:
+	
 		BombPlacedMessage(Bomb::BombId, Position);
-		BombPlacedMessage(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		BombPlacedMessage(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class BombExplodedMessage {};
+	struct BombExplodedMessage {};
 
-	class PlayerMovedMessage {
-	private:
+	struct PlayerMovedMessage {
 		Player::PlayerId id;
 		Position position;
-	public:
+	
 		PlayerMovedMessage(Player::PlayerId, Position);
-		PlayerMovedMessage(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		PlayerMovedMessage(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class BlockPlacedMessage {};
+	struct BlockPlacedMessage {};
 
-	class Event {
-	private:
+	struct Event {
 		using EventVariant = std::variant<BombPlacedMessage,
 										  BombExplodedMessage,
 										  PlayerMovedMessage,
 										  BlockPlacedMessage,
 										  EmptyMessage>; //needed?
 		EventType type;
-		EventVariant event_variant;
-	public:
+		EventVariant data;
+	
 		Event(EventType, EventVariant);
-		Event(buffers::Buffer&);
-		uint32_t serialize(char *) const;
+		Event(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
 	enum struct ServerToClientType : uint8_t {
 		Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4
 	};
 
-	class HelloMessage {
-	private:
+	struct HelloMessage {
 		std::string server_name;
 		uint8_t players_count;
 		uint16_t size_x, size_y;
 		uint16_t game_length;
 		uint16_t explosion_radius, bomb_timer;
-	public:
-		HelloMessage(buffers::Buffer&);
+	
+		HelloMessage(ServerConnection*);
 	};
 
-	class AcceptedPlayerMessage {};
+	struct AcceptedPlayerMessage {};
 
-	class GameStartedMessage {};
+	struct GameStartedMessage {};
 
-	class TurnMessage {
-	private:
+	struct TurnMessage {
 		uint16_t turn;
 		std::vector<Event> events;
-	public:
+	
 		TurnMessage(uint16_t, std::vector<Event>);
-		TurnMessage(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		TurnMessage(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
-	class GameEndedMessage {};
+	struct GameEndedMessage {};
 
-	class ServerToClient {
-	private:
+	struct ServerToClient {
 		using ServerToClientVariant = std::variant<HelloMessage,
 												  AcceptedPlayerMessage,
 												  GameStartedMessage,
@@ -185,28 +172,56 @@ namespace messages {
 												  GameEndedMessage,
 												  EmptyMessage>;
 		ServerToClientType type;
-		ServerToClientVariant message_variant;
-	public:
+		ServerToClientVariant data;
+	
 		ServerToClient(ServerToClientType, ServerToClientVariant);
-		ServerToClient(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		ServerToClient(ServerConnection*);
+		void serialize(buffers::Buffer&) const;
 	};
 
 	enum struct GUIToClientType : uint8_t {
 		PlaceBomb = 0, PlaceBlock = 1, Move = 2
 	};
 
-	class GUIToClient {
-	private:
+	struct GUIToClient {
 		using GUIToClientVariant = std::variant<PlaceBombMessage,
 												PlaceBlockMessage,
 												MoveMessage>;
 		GUIToClientType type;
-		GUIToClientVariant message_variant;
-	public:
+		GUIToClientVariant data;
+
 		GUIToClient(GUIToClientType, GUIToClientVariant);
-		GUIToClient(buffers::Buffer&);
-		uint32_t serialize(buffers::Buffer&) const;
+		GUIToClient(ServerConnection*);
+		void serialize(buffers::Buffer&) const; // Buffer
+	};
+
+	enum struct ClientToGUIType : uint8_t {
+		Lobby = 0, Game = 1
+	};
+
+	struct LobbyMessage {
+		std::string server_name;
+		uint8_t players_count;
+		uint16_t size_x, size_y;
+		uint16_t game_length;
+		uint16_t explosion_radius, bomb_timer;
+		std::unordered_map<Player::PlayerId, Player> players;
+
+		LobbyMessage(std::string, uint8_t, uint16_t, uint16_t,
+					 uint16_t, uint16_t, uint16_t, std::unordered_map<Player::PlayerId, Player>);
+		void serialize(buffers::Buffer&) const;
+	};
+
+	struct GameMessage {};
+
+	struct ClientToGUI {
+		using ClientToGUIVariant = std::variant<LobbyMessage,
+												GameMessage>;
+		ClientToGUIType type;
+		ClientToGUIVariant data;
+
+		ClientToGUI(ClientToGUIType, ClientToGUIVariant);
+		void serialize(buffers::Buffer&) const;
 	};
 }
 
