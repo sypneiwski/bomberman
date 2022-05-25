@@ -28,6 +28,7 @@ namespace messages {
 
 	struct Player {
 		using PlayerId = uint8_t;
+		using Score = uint32_t;
 		std::string name, address;
 
 		Player() = default;
@@ -87,6 +88,7 @@ namespace messages {
 		uint16_t explosion_radius, bomb_timer;
 		Player::PlayerId player_id;
 		Player player;
+		std::unordered_map<Player::PlayerId, Player> players;
 		uint16_t turn;
 		std::vector<Event> events;
 	
@@ -118,6 +120,11 @@ namespace messages {
 		uint16_t game_length;
 		uint16_t explosion_radius, bomb_timer;
 		std::unordered_map<Player::PlayerId, Player> players;
+		std::unordered_map<Player::PlayerId, Position> player_positions;
+		std::vector<Position> blocks;
+		std::vector<Bomb> bombs;
+		std::vector<Position> explosions;
+		std::unordered_map<Player::PlayerId, Player::Score> scores;
 
 		ClientToGUI() = default;
 		void serialize(Buffer&) const;

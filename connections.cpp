@@ -55,12 +55,13 @@ void Buffer::clear() {
 }
 
 GUIConnection::GUIConnection(boost::asio::io_context &io_context, options::Options &options)
-		: socket(io_context, udp::endpoint(udp::v6(), options.port)), ptr(data), end(data) {
+		: socket(io_context, udp::endpoint(udp::v4(), options.port)), ptr(data), end(data) {
 	udp::resolver resolver(io_context);
 	boost::system::error_code ec;
-	endpoint = *resolver.resolve(options.gui_address, options.gui_port, ec).begin();
+	auto endpoints = resolver.resolve(udp::v4(), options.gui_address, options.gui_port, ec);
 	if (ec)
 		throw std::invalid_argument("Could not connect to GUI");
+	endpoint = *endpoints.begin();	
 }
 
 void GUIConnection::write(Buffer &buffer) {
@@ -99,11 +100,17 @@ ServerConnection::ServerConnection(boost::asio::io_context &io_context, options:
 		: socket(io_context) {
 	tcp::resolver resolver(io_context);
 	boost::system::error_code ec;
-	auto endpoints = resolver.resolve(options.server_address, options.server_port);
+	auto endpoints = resolver.resolve(options.server_address, options.server_port, ec);
+	if (ec)
+		throw std::invalid_argument("Could not resolve server address");
 	boost::asio::connect(socket, endpoints, ec);
 	socket.set_option(tcp::no_delay(true));
 	if (ec)
 		throw std::invalid_argument("Could not connect to server");
+}
+
+void ServerConnection::write(Buffer &buffer) {
+	boost::asio::write(socket, boost::asio::buffer(buffer.get_data(), buffer.size()));
 }
 
 template<typename T>
@@ -136,7 +143,7 @@ ServerConnection& ServerConnection::read_string(std::string &buffer) {
 	read8(len);
 	char ret[len + 1];
 	memset(ret, 0, len + 1);
-	read(ret, len + 1);
+	read(ret, len);
 	buffer = std::string(ret);
 	return *this;
 }

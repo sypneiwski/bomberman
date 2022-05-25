@@ -16,11 +16,15 @@ namespace {
 	private:
 		GameState game_state{GameState::Lobby};
 		boost::asio::io_context io_context{};
+		std::string player_name;
 		ServerConnection serv_conn;
 		GUIConnection gui_conn;
+
 	public:
 		Client(options::Options &options)
-		: serv_conn(io_context, options), gui_conn(io_context, options) {}
+		: player_name(options.player_name),
+		  serv_conn(io_context, options), 
+		  gui_conn(io_context, options) {}
 
 		messages::ClientToGUI& process_server_message() {
 			using namespace messages; // można tak?
@@ -40,6 +44,9 @@ namespace {
 				case ServerToClientType::AcceptedPlayer:
 					out_message.players[in_message.player_id] = in_message.player;
 					break;
+				case ServerToClientType::GameStarted:
+					game_state = GameState::Game;
+					break;	
 				default:
 					throw std::invalid_argument("tu powinno byc cos innego");
 			}
@@ -52,18 +59,23 @@ namespace {
 			static ClientToServer out_message;
 			GUIToClient in_message(gui_conn);
 
-			// somehow send join
-			switch (in_message.type) {
-				case GUIToClientType::PlaceBomb:
-					out_message.type = ClientToServerType::PlaceBomb;
-					break;
-				case GUIToClientType::PlaceBlock:
-					out_message.type = ClientToServerType::PlaceBlock;
-					break;
-				case GUIToClientType::Move:
-					out_message.type = ClientToServerType::Move;
-					out_message.direction = in_message.direction;
-					break;
+			if (game_state == GameState::Lobby) {
+				out_message.type = ClientToServerType::Join;
+				out_message.name = player_name;
+			}
+			else {
+				switch (in_message.type) {
+					case GUIToClientType::PlaceBomb:
+						out_message.type = ClientToServerType::PlaceBomb;
+						break;
+					case GUIToClientType::PlaceBlock:
+						out_message.type = ClientToServerType::PlaceBlock;
+						break;
+					case GUIToClientType::Move:
+						out_message.type = ClientToServerType::Move;
+						out_message.direction = in_message.direction;
+						break;
+				}
 			}
 
 			return out_message;
@@ -75,38 +87,42 @@ namespace {
 			gui_conn.write(serialized);
 			serialized.clear();
 		}
+
+		void send_server_message(messages::ClientToServer &message) {
+			static Buffer serialized;
+			message.serialize(serialized);
+			serv_conn.write(serialized);
+			serialized.clear();
+		}
 	};
 
 	void listen_for_server(Client &client) {
-		try {
-			for (;;) {
-				messages::ClientToGUI out_message = client.process_server_message();
-				client.send_gui_message(out_message);
-			}
-		}
-		catch (std::exception &e) {
-			std::cout << "ERROR : " << e.what() << "\n";
+		for (;;) {
+			messages::ClientToGUI out_message = client.process_server_message();
+			client.send_gui_message(out_message);
 		}
 	}
 
 	void listen_for_gui(Client &client) {
-		try {
-			for (;;) {
-				messages::ClientToServer out_message = client.process_gui_message();
-			}
-		}
-		catch (std::exception &e) {
-			std::cout << "ERROR : " << e.what() << "\n";
+		for (;;) {
+			messages::ClientToServer out_message = client.process_gui_message();
+			client.send_server_message(out_message);
 		}
 	}
 }
 
 int main(int argc, char *argv[]) {
-	options::Options options = options::Options(argc, argv);
-	Client client(options);
-	//boost::thread t1(boost::bind(&listen_for_server, std::ref(client)));
-	boost::thread t2(boost::bind(&listen_for_gui, std::ref(client)));
-	//t1.join();
-	t2.join();
+	try {
+		options::Options options = options::Options(argc, argv);
+		Client client(options);
+		boost::thread t1(boost::bind(&listen_for_server, std::ref(client)));
+		boost::thread t2(boost::bind(&listen_for_gui, std::ref(client)));
+		t1.join();
+		t2.join();
+	}
+	catch (std::exception &e) {
+		std::cerr << "ERROR : " << e.what() << "\n";
+		exit(EXIT_FAILURE);
+	}
 	return 0;
 }

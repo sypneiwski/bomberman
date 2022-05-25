@@ -73,6 +73,8 @@ class ServerConnection {
 public:
 	ServerConnection(boost::asio::io_context&, options::Options&);
 
+	void write(Buffer&);
+
 	ServerConnection& read8(uint8_t&);
 
 	ServerConnection& read16(uint16_t&);

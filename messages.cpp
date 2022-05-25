@@ -29,10 +29,22 @@ namespace messages {
 	}
 
 	void Player::serialize(Buffer& buff) const {
-		buff.write8(name.size())
-			.write_string(name)
-			.write8(address.size())
+		buff.write_string(name)
 			.write_string(address);
+	}
+
+	void ClientToServer::serialize(Buffer& buff) const {
+		buff.write8(static_cast<uint8_t>(type));
+		switch (type) {
+			case ClientToServerType::Join:
+				buff.write_string(name);
+				break;
+			case ClientToServerType::Move:
+				buff.write8(static_cast<uint8_t>(direction));
+				break;
+			default:
+				break;		
+		}
 	}
 
 	Event::Event(ServerConnection &conn) {
@@ -70,6 +82,15 @@ namespace messages {
 			case ServerToClientType::AcceptedPlayer:
 				conn.read8(player_id);
 				player = Player(conn);
+				break;
+			case ServerToClientType::GameStarted:
+				uint32_t len;
+				conn.read32(len);
+				for (uint32_t i = 0; i < len; i++) {
+					conn.read8(player_id);
+					player = Player(conn);
+					players[player_id] = player;
+				}
 				break;
 			case ServerToClientType::Turn:
 				conn.read16(turn);
