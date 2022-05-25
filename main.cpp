@@ -3,17 +3,18 @@
 #include <exception>
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
+#include <optional>
 #include "program_options.hpp"
 #include "messages.hpp"
 #include "connections.hpp"
 
 namespace {
-	enum struct GameState {
-		Lobby = 0, Game = 1
-	};
-
 	class Client {
 	private:
+		enum struct GameState {
+			Lobby = 0, Game = 1
+		};
+
 		GameState game_state{GameState::Lobby};
 		boost::asio::io_context io_context{};
 		std::string player_name;
@@ -26,59 +27,69 @@ namespace {
 		  serv_conn(io_context, options), 
 		  gui_conn(io_context, options) {}
 
-		messages::ClientToGUI& process_server_message() {
+		std::optional<std::reference_wrapper<messages::ClientToGUI>> process_server_message() {
 			using namespace messages; // można tak?
-			static ClientToGUI out_message;
-			ServerToClient in_message(serv_conn);
+			static ClientToGUI out;
+			ServerToClient in(serv_conn);
 
-			switch (in_message.type) {
+			switch (in.type) {
 				case ServerToClientType::Hello:
-					out_message.server_name = in_message.server_name;
-					out_message.player_count = in_message.player_count;
-					out_message.size_x = in_message.size_x;
-					out_message.size_y = in_message.size_y;
-					out_message.game_length = in_message.game_length;
-					out_message.explosion_radius = in_message.explosion_radius;
-					out_message.bomb_timer = in_message.bomb_timer;
+					out.server_name = in.server_name;
+					out.player_count = in.player_count;
+					out.size_x = in.size_x;
+					out.size_y = in.size_y;
+					out.game_length = in.game_length;
+					out.explosion_radius = in.explosion_radius;
+					out.bomb_timer = in.bomb_timer;
 					break;
 				case ServerToClientType::AcceptedPlayer:
-					out_message.players[in_message.player_id] = in_message.player;
+					out.players[in.player_id] = in.player;
+					out.scores[in.player_id] = 0;
 					break;
 				case ServerToClientType::GameStarted:
 					game_state = GameState::Game;
-					break;	
-				default:
-					throw std::invalid_argument("tu powinno byc cos innego");
+					out.player_positions.clear();
+					out.blocks.clear();
+					out.bombs.clear();
+					break;
+				case ServerToClientType::Turn:
+					break;
+				case ServerToClientType::GameEnded:
+					game_state = GameState::Lobby;
+					out.scores = in.scores;
+					break;
 			}
-			out_message.type = static_cast<ClientToGUIType>(game_state);
-			return out_message;
+			out.type = static_cast<ClientToGUIType>(game_state);
+			if (in.type == ServerToClientType::GameStarted)
+				return std::nullopt;
+			return out;
 		}
 
 		messages::ClientToServer& process_gui_message() {
 			using namespace messages;
-			static ClientToServer out_message;
-			GUIToClient in_message(gui_conn);
+			static ClientToServer out;
+			GUIToClient in(gui_conn);
 
 			if (game_state == GameState::Lobby) {
-				out_message.type = ClientToServerType::Join;
-				out_message.name = player_name;
+				out.type = ClientToServerType::Join;
+				out.name = player_name;
 			}
 			else {
-				switch (in_message.type) {
+				switch (in.type) {
 					case GUIToClientType::PlaceBomb:
-						out_message.type = ClientToServerType::PlaceBomb;
+						out.type = ClientToServerType::PlaceBomb;
 						break;
 					case GUIToClientType::PlaceBlock:
-						out_message.type = ClientToServerType::PlaceBlock;
+						out.type = ClientToServerType::PlaceBlock;
 						break;
 					case GUIToClientType::Move:
-						out_message.type = ClientToServerType::Move;
-						out_message.direction = in_message.direction;
+						out.type = ClientToServerType::Move;
+						out.direction = in.direction;
 						break;
 				}
 			}
 
-			return out_message;
+			return out;
 		}
 
 		void send_gui_message(messages::ClientToGUI &message) {
@@ -98,15 +109,16 @@ namespace {
 
 	void listen_for_server(Client &client) {
 		for (;;) {
-			messages::ClientToGUI out_message = client.process_server_message();
-			client.send_gui_message(out_message);
+			auto out = client.process_server_message();
+			if (out)
+				client.send_gui_message(out->get());
 		}
 	}
 
 	void listen_for_gui(Client &client) {
 		for (;;) {
-			messages::ClientToServer out_message = client.process_gui_message();
-			client.send_server_message(out_message);
+			messages::ClientToServer out = client.process_gui_message();
+			client.send_server_message(out);
 		}
 	}
 }

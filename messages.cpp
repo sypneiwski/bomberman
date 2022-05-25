@@ -66,6 +66,7 @@ namespace messages {
 	}
 
 	ServerToClient::ServerToClient(ServerConnection &conn) {
+		uint32_t len;	
 		uint8_t u8;
 		conn.read8(u8);
 		type = ServerToClientType(u8);
@@ -84,7 +85,6 @@ namespace messages {
 				player = Player(conn);
 				break;
 			case ServerToClientType::GameStarted:
-				uint32_t len;
 				conn.read32(len);
 				for (uint32_t i = 0; i < len; i++) {
 					conn.read8(player_id);
@@ -95,6 +95,15 @@ namespace messages {
 			case ServerToClientType::Turn:
 				conn.read16(turn);
 				read_list(events, conn);
+				break;
+			case ServerToClientType::GameEnded:
+				conn.read32(len);
+				for (uint32_t i = 0; i < len; i++) {
+					Player::Score score;
+					conn.read8(player_id)
+						.read32(score);
+					scores[player_id] = score;	
+				}
 				break;
 			default:
 				throw DeserializingError();

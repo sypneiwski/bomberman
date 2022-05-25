@@ -91,6 +91,7 @@ namespace messages {
 		std::unordered_map<Player::PlayerId, Player> players;
 		uint16_t turn;
 		std::vector<Event> events;
+		std::unordered_map<Player::PlayerId, Player::Score> scores;
 	
 		ServerToClient(ServerConnection&);
 		void serialize(Buffer&) const;
