@@ -43,9 +43,11 @@ private:
 	void write(T);
 };
 
+class GUIReadError : public std::exception {};
+
 class GUIConnection {
 public:
-	GUIConnection(boost::asio::io_context&, options::Options&);
+	GUIConnection(boost::asio::io_context&, Options&);
 
 	void write(Buffer&);
 
@@ -56,6 +58,8 @@ public:
 	GUIConnection& read32(uint32_t&);
 
 	GUIConnection& read_string(std::string&);
+
+	bool has_more();
 
 private:
 	using udp = boost::asio::ip::udp;
@@ -70,9 +74,16 @@ private:
 	void read(T*, size_t);
 };
 
+class ServerReadError : public std::exception {
+public:
+	const char * what () const throw () {
+		return "Unable to parse message from server.";
+	}
+};
+
 class ServerConnection {
 public:
-	ServerConnection(boost::asio::io_context&, options::Options&);
+	ServerConnection(boost::asio::io_context&, Options&);
 
 	void write(Buffer&);
 

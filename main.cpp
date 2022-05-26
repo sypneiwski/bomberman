@@ -4,6 +4,9 @@
 #include <boost/asio.hpp>
 #include <boost/thread.hpp>
 #include <optional>
+#include <set>
+#include <utility>
+#include <mutex>
 #include "program_options.hpp"
 #include "messages.hpp"
 #include "connections.hpp"
@@ -15,23 +18,45 @@ namespace {
 			Lobby = 0, Game = 1
 		};
 
+		std::mutex state_mutex;
 		GameState game_state{GameState::Lobby};
 		boost::asio::io_context io_context{};
 		std::string player_name;
 		ServerConnection serv_conn;
 		GUIConnection gui_conn;
 
+		void count_explosions(const Event &event, ClientToGUI& out) {
+			static std::vector<std::pair<int32_t,int32_t>> sides = {
+				{1,0}, {0,1}, {-1, 0}, {0, -1}
+			};
+			for (const std::pair<int32_t, int32_t> &side : sides) {
+				Position p = out.bombs[event.bomb_id].position;
+				int32_t x = p.x, y = p.y;
+				for (uint16_t i = 0; i <= out.explosion_radius; i++) {
+					p = Position(x, y);
+					out.explosions.insert(p);
+					if (out.blocks.count(p) == 1) // change to contains
+						break;
+					x += side.first;
+					y += side.second;
+					if (x == -1 || x == out.size_x || y == -1 || y == out.size_y)
+						break;	
+				}
+			}
+		}
 	public:
-		Client(options::Options &options)
+		Client(Options &options)
 		: player_name(options.player_name),
 		  serv_conn(io_context, options), 
 		  gui_conn(io_context, options) {}
 
-		std::optional<std::reference_wrapper<messages::ClientToGUI>> process_server_message() {
-			using namespace messages; // można tak?
+		std::optional<std::reference_wrapper<ClientToGUI>> process_server_message() {
 			static ClientToGUI out;
+			static std::set<Player::PlayerId> destroyed_players;
+			static std::set<Position> destroyed_blocks;
+			const std::lock_guard<std::mutex> lock(state_mutex);
+			
 			ServerToClient in(serv_conn);
-
 			switch (in.type) {
 				case ServerToClientType::Hello:
 					out.server_name = in.server_name;
@@ -54,6 +79,9 @@ namespace {
 					break;
 				case ServerToClientType::Turn:
 					out.explosions.clear();
+					destroyed_players.clear();
+					destroyed_blocks.clear();
+					out.turn = in.turn;
 					for (auto &[id, bomb] : out.bombs)
 						bomb.timer--;
 
@@ -64,9 +92,11 @@ namespace {
 								out.bombs[event.bomb_id] = Bomb(event.position, out.bomb_timer);
 								break;
 							case EventType::BombExploded:
-								// add all 
-								for (const Position& position : event.destroyed_blocks)
-									
+								count_explosions(event, out);
+								for (const Position &position : event.destroyed_blocks)
+									destroyed_blocks.insert(position);
+								for (const Player::PlayerId &id : event.destroyed_players)
+									destroyed_players.insert(id);
 								out.bombs.erase(event.bomb_id);
 								break;
 							case EventType::PlayerMoved:
@@ -76,7 +106,10 @@ namespace {
 								out.blocks.insert(event.position);		
 						}
 					}
-
+					for (const Position &position : destroyed_blocks)
+						out.blocks.erase(position);
+					for (const Player::PlayerId &id : destroyed_players)
+						out.scores[id]++;	
 					break;
 				case ServerToClientType::GameEnded:
 					game_state = GameState::Lobby;
@@ -90,10 +123,13 @@ namespace {
 			return out;
 		}
 
-		messages::ClientToServer& process_gui_message() {
-			using namespace messages;
+		ClientToServer& process_gui_message() {
 			static ClientToServer out;
+			const std::lock_guard<std::mutex> lock(state_mutex);
+
 			GUIToClient in(gui_conn);
+			if (gui_conn.has_more())
+				throw GUIReadError();
 
 			if (game_state == GameState::Lobby) {
 				out.type = ClientToServerType::Join;
@@ -117,14 +153,14 @@ namespace {
 			return out;
 		}
 
-		void send_gui_message(messages::ClientToGUI &message) {
+		void send_gui_message(ClientToGUI &message) {
 			static Buffer serialized;
 			message.serialize(serialized);
 			gui_conn.write(serialized);
 			serialized.clear();
 		}
 
-		void send_server_message(messages::ClientToServer &message) {
+		void send_server_message(ClientToServer &message) {
 			static Buffer serialized;
 			message.serialize(serialized);
 			serv_conn.write(serialized);
@@ -143,10 +179,10 @@ namespace {
 	void listen_for_gui(Client &client) {
 		for (;;) {
 			try {
-				messages::ClientToServer out = client.process_gui_message();
+				ClientToServer out = client.process_gui_message();
 				client.send_server_message(out);
 			}
-			catch (messages::NonTerminatingError &e) {
+			catch (GUIReadError &e) {
 				continue;
 			}
 		}
@@ -155,14 +191,14 @@ namespace {
 
 int main(int argc, char *argv[]) {
 	try {
-		options::Options options = options::Options(argc, argv);
+		Options options = Options(argc, argv);
 		Client client(options);
 		boost::thread t1(boost::bind(&listen_for_server, std::ref(client)));
 		boost::thread t2(boost::bind(&listen_for_gui, std::ref(client)));
 		t1.join();
 		t2.join();
 	}
-	catch (messages::DeserializingError &e) {
+	catch (ServerReadError &e) {
 		std::cerr << "ERROR : " << e.what() << "\n";
 		exit(EXIT_SUCCESS);
 	}

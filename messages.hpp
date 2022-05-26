@@ -7,135 +7,122 @@
 #include <set>
 #include "connections.hpp"
 
-namespace messages {
-	class DeserializingError : public std::exception {
-	public:
-		const char * what () const throw () {
-			return "Deserializing error.";
-		}
-	};
+enum struct Direction : uint8_t {
+	Up = 0, Right = 1, Down = 2, Left = 3, MAX = 3
+};
 
-	class NonTerminatingError : public std::exception {};
+struct Position {
+	uint16_t x, y;
+	bool operator<(const Position&) const;
 
-	enum struct Direction : uint8_t {
-		Up = 0, Right = 1, Down = 2, Left = 3, MAX = 3
-	};
+	Position() = default;
+	Position(uint16_t, uint16_t);
+	Position(ServerConnection&);
+	void serialize(Buffer&) const;
+};
 
-	struct Position {
-		uint16_t x, y;
-		bool operator<(const Position&) const;
+struct Player {
+	using PlayerId = uint8_t;
+	using Score = uint32_t;
+	std::string name, address;
 
-		Position() = default;
-		Position(uint16_t, uint16_t);
-		Position(ServerConnection&);
-		void serialize(Buffer&) const;
-	};
+	Player() = default;
+	Player(std::string, std::string);
+	Player(ServerConnection&);
+	void serialize(Buffer&) const;
+};
 
-	struct Player {
-		using PlayerId = uint8_t;
-		using Score = uint32_t;
-		std::string name, address;
+struct Bomb {
+	using BombId = uint32_t;
+	Position position;
+	uint16_t timer;
 
-		Player() = default;
-		Player(std::string, std::string);
-		Player(ServerConnection&);
-		void serialize(Buffer&) const;
-	};
+	Bomb() = default;
+	Bomb(Position, uint16_t);
+	void serialize(Buffer&) const;
+};
 
-	struct Bomb {
-		using BombId = uint32_t;
-		Position position;
-		uint16_t timer;
+enum struct ClientToServerType : uint8_t {
+	Join = 0, PlaceBomb = 1, PlaceBlock = 2, Move = 3, MAX = 3
+};
 
-		Bomb() = default;
-		Bomb(Position, uint16_t);
-		void serialize(Buffer&) const;
-	};
+struct ClientToServer {
+	ClientToServerType type;
+	std::string name;
+	Direction direction;
 
-	enum struct ClientToServerType : uint8_t {
-		Join = 0, PlaceBomb = 1, PlaceBlock = 2, Move = 3, MAX = 3
-	};
+	ClientToServer() = default;
+	void serialize(Buffer&) const;
+};
 
-	struct ClientToServer {
-		ClientToServerType type;
-		std::string name;
-		Direction direction;
+enum struct EventType : uint8_t {
+	BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, BlockPlaced = 3, MAX = 3
+};
 
-		ClientToServer() = default;
-		void serialize(Buffer&) const;
-	};
+struct Event {
+	EventType type;
+	Bomb::BombId bomb_id;
+	Player::PlayerId player_id;
+	Position position;
+	std::vector<Player::PlayerId> destroyed_players;
+	std::vector<Position> destroyed_blocks;
 
-	enum struct EventType : uint8_t {
-		BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, BlockPlaced = 3, MAX = 3
-	};
+	Event(ServerConnection&);
+};
 
-	struct Event {
-		EventType type;
-		Bomb::BombId bomb_id;
-		Player::PlayerId player_id;
-		Position position;
-		std::vector<Player::PlayerId> destroyed_players;
-		std::vector<Position> destroyed_blocks;
+enum struct ServerToClientType : uint8_t {
+	Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4, MAX = 3
+};
 
-		Event(ServerConnection&);
-		void serialize(Buffer&) const;
-	};
+struct ServerToClient {
+	ServerToClientType type;
+	std::string server_name;
+	uint8_t player_count;
+	uint16_t size_x, size_y;
+	uint16_t game_length;
+	uint16_t explosion_radius, bomb_timer;
+	Player::PlayerId player_id;
+	Player player;
+	std::unordered_map<Player::PlayerId, Player> players;
+	uint16_t turn;
+	std::vector<Event> events;
+	std::unordered_map<Player::PlayerId, Player::Score> scores;
 
-	enum struct ServerToClientType : uint8_t {
-		Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4, MAX = 3
-	};
+	ServerToClient(ServerConnection&);
+};
 
-	struct ServerToClient {
-		ServerToClientType type;
-		std::string server_name;
-		uint8_t player_count;
-		uint16_t size_x, size_y;
-		uint16_t game_length;
-		uint16_t explosion_radius, bomb_timer;
-		Player::PlayerId player_id;
-		Player player;
-		std::unordered_map<Player::PlayerId, Player> players;
-		uint16_t turn;
-		std::vector<Event> events;
-		std::unordered_map<Player::PlayerId, Player::Score> scores;
-	
-		ServerToClient(ServerConnection&);
-		void serialize(Buffer&) const;
-	};
+enum struct GUIToClientType : uint8_t {
+	PlaceBomb = 0, PlaceBlock = 1, Move = 2, MAX = 2
+};
 
-	enum struct GUIToClientType : uint8_t {
-		PlaceBomb = 0, PlaceBlock = 1, Move = 2, MAX = 2
-	};
+struct GUIToClient {
+	GUIToClientType type;
+	Direction direction;
 
-	struct GUIToClient {
-		GUIToClientType type;
-		Direction direction;
+	GUIToClient(GUIConnection&);
+};
 
-		GUIToClient(GUIConnection&);
-		void serialize(Buffer&) const;
-	};
+enum struct ClientToGUIType : uint8_t {
+	Lobby = 0, Game = 1, MAX = 1
+};
 
-	enum struct ClientToGUIType : uint8_t {
-		Lobby = 0, Game = 1, MAX = 1
-	};
+struct ClientToGUI {
+	ClientToGUIType type;
+	std::string server_name;
+	uint8_t player_count;
+	uint16_t size_x, size_y;
+	uint16_t game_length;
+	uint16_t explosion_radius, bomb_timer;
+	std::unordered_map<Player::PlayerId, Player> players;
+	uint16_t turn;
+	std::unordered_map<Player::PlayerId, Position> player_positions;
+	std::set<Position> blocks;
+	std::unordered_map<Bomb::BombId, Bomb> bombs;
+	std::set<Position> explosions;
+	std::unordered_map<Player::PlayerId, Player::Score> scores;
 
-	struct ClientToGUI {
-		ClientToGUIType type;
-		std::string server_name;
-		uint8_t player_count;
-		uint16_t size_x, size_y;
-		uint16_t game_length;
-		uint16_t explosion_radius, bomb_timer;
-		std::unordered_map<Player::PlayerId, Player> players;
-		std::unordered_map<Player::PlayerId, Position> player_positions;
-		std::set<Position> blocks;
-		std::unordered_map<Bomb::BombId, Bomb> bombs;
-		std::set<Position> explosions;
-		std::unordered_map<Player::PlayerId, Player::Score> scores;
-
-		ClientToGUI() = default;
-		void serialize(Buffer&) const;
-	};
-}
+	ClientToGUI() = default;
+	void serialize(Buffer&) const;
+};
 
 #endif // MESSAGES_HPP

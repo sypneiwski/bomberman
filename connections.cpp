@@ -5,7 +5,6 @@
 #include <boost/asio.hpp>
 #include <endian.h>
 #include "connections.hpp"
-#include "messages.hpp"
 
 Buffer::Buffer() : ptr(data), end(data + BUFFER_SIZE) {}
 
@@ -54,7 +53,7 @@ void Buffer::clear() {
 	ptr = data;
 }
 
-GUIConnection::GUIConnection(boost::asio::io_context &io_context, options::Options &options)
+GUIConnection::GUIConnection(boost::asio::io_context &io_context, Options &options)
 		: socket(io_context, udp::endpoint(udp::v6(), options.port)), ptr(data), end(data) {
 	udp::resolver resolver(io_context);
 	boost::system::error_code ec;
@@ -96,7 +95,11 @@ GUIConnection& GUIConnection::read32(uint32_t &number) {
 	return *this;
 }
 
-ServerConnection::ServerConnection(boost::asio::io_context &io_context, options::Options &options)
+bool GUIConnection::has_more() {
+	return ptr < end;
+}
+
+ServerConnection::ServerConnection(boost::asio::io_context &io_context, Options &options)
 		: socket(io_context) {
 	tcp::resolver resolver(io_context);
 	boost::system::error_code ec;
