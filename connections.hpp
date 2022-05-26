@@ -29,7 +29,7 @@ public:
 
 	Buffer &write_string(std::string);
 
-	size_t size();
+	size_t size() const;
 
 	char* get_data();
 
@@ -59,7 +59,7 @@ public:
 
 	GUIConnection& read_string(std::string&);
 
-	bool has_more();
+	bool has_more() const;
 
 private:
 	using udp = boost::asio::ip::udp;

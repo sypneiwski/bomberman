@@ -41,7 +41,7 @@ Buffer &Buffer::write_string(std::string buffer) {
 	return *this;
 }
 
-size_t Buffer::size() {
+size_t Buffer::size() const {
 	return ptr - data;
 }
 
@@ -64,6 +64,14 @@ GUIConnection::GUIConnection(boost::asio::io_context &io_context, Options &optio
 }
 
 void GUIConnection::write(Buffer &buffer) {
+	//debug
+	size_t s = buffer.size();
+	char* d = buffer.get_data();
+	std::cout << "printing buffer\n[";
+	for (size_t i = 0; i < s; i++)
+		std::cout << (int) ((uint8_t) d[i]) << ", ";
+	std::cout << "]\n";	
+	//debug
 	socket.send_to(boost::asio::buffer(buffer.get_data(), buffer.size()), endpoint);
 }
 
@@ -95,7 +103,7 @@ GUIConnection& GUIConnection::read32(uint32_t &number) {
 	return *this;
 }
 
-bool GUIConnection::has_more() {
+bool GUIConnection::has_more() const {
 	return ptr < end;
 }
 

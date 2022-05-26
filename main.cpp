@@ -85,6 +85,10 @@ namespace {
 				case ServerToClientType::GameStarted:
 					std::cout << "GameStarted\n";
 					game_state = GameState::Game;
+					out.players = in.players;
+					out.scores.clear();
+					for (const auto &[id, player] : out.players)
+						out.scores[id] = 0;
 					out.player_positions.clear();
 					out.blocks.clear();
 					out.bombs.clear();
