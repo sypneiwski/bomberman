@@ -1,8 +1,14 @@
 #ifndef PROGRAM_OPTIONS_HPP
 #define PROGRAM_OPTIONS_HPP
 #include <string>
+#include <exception>
 
 namespace options {
+	class OptionsError : public std::invalid_argument {
+	public:
+		OptionsError(std::string const& e) : std::invalid_argument(e) {}
+	};
+
 	struct Options {
 		std::string gui_address,
 					gui_port,

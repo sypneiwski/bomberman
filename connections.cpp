@@ -55,10 +55,10 @@ void Buffer::clear() {
 }
 
 GUIConnection::GUIConnection(boost::asio::io_context &io_context, options::Options &options)
-		: socket(io_context, udp::endpoint(udp::v4(), options.port)), ptr(data), end(data) {
+		: socket(io_context, udp::endpoint(udp::v6(), options.port)), ptr(data), end(data) {
 	udp::resolver resolver(io_context);
 	boost::system::error_code ec;
-	auto endpoints = resolver.resolve(udp::v4(), options.gui_address, options.gui_port, ec);
+	auto endpoints = resolver.resolve(options.gui_address, options.gui_port, ec);
 	if (ec)
 		throw std::invalid_argument("Could not connect to GUI");
 	endpoint = *endpoints.begin();	
@@ -118,7 +118,7 @@ void ServerConnection::read(T* buffer, size_t size) {
 	boost::system::error_code ec;
 	boost::asio::read(socket, boost::asio::buffer(buffer, size), ec);
 	if (ec)
-		throw std::invalid_argument("tu cos innego");
+		throw std::runtime_error("Receiving data from server failed");
 }
 
 ServerConnection& ServerConnection::read8(uint8_t &number) {

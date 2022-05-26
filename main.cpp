@@ -53,10 +53,35 @@ namespace {
 					out.bombs.clear();
 					break;
 				case ServerToClientType::Turn:
+					out.explosions.clear();
+					for (auto &[id, bomb] : out.bombs)
+						bomb.timer--;
+
+					// Process this turn's events.
+					for (const Event &event : in.events) {
+						switch (event.type) {
+							case EventType::BombPlaced:
+								out.bombs[event.bomb_id] = Bomb(event.position, out.bomb_timer);
+								break;
+							case EventType::BombExploded:
+								// add all 
+								for (const Position& position : event.destroyed_blocks)
+									
+								out.bombs.erase(event.bomb_id);
+								break;
+							case EventType::PlayerMoved:
+								out.player_positions[event.player_id] = event.position;	
+								break;
+							case EventType::BlockPlaced:
+								out.blocks.insert(event.position);		
+						}
+					}
+
 					break;
 				case ServerToClientType::GameEnded:
 					game_state = GameState::Lobby;
-					out.scores = in.scores;
+					out.players.clear();
+					out.scores.clear();
 					break;
 			}
 			out.type = static_cast<ClientToGUIType>(game_state);
@@ -117,8 +142,13 @@ namespace {
 
 	void listen_for_gui(Client &client) {
 		for (;;) {
-			messages::ClientToServer out = client.process_gui_message();
-			client.send_server_message(out);
+			try {
+				messages::ClientToServer out = client.process_gui_message();
+				client.send_server_message(out);
+			}
+			catch (messages::NonTerminatingError &e) {
+				continue;
+			}
 		}
 	}
 }
@@ -131,6 +161,10 @@ int main(int argc, char *argv[]) {
 		boost::thread t2(boost::bind(&listen_for_gui, std::ref(client)));
 		t1.join();
 		t2.join();
+	}
+	catch (messages::DeserializingError &e) {
+		std::cerr << "ERROR : " << e.what() << "\n";
+		exit(EXIT_SUCCESS);
 	}
 	catch (std::exception &e) {
 		std::cerr << "ERROR : " << e.what() << "\n";

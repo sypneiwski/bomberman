@@ -4,21 +4,26 @@
 #include <vector>
 #include <exception>
 #include <unordered_map>
+#include <set>
 #include "connections.hpp"
 
 namespace messages {
 	class DeserializingError : public std::exception {
+	public:
 		const char * what () const throw () {
 			return "Deserializing error.";
 		}
 	};
 
+	class NonTerminatingError : public std::exception {};
+
 	enum struct Direction : uint8_t {
-		Up = 0, Right = 1, Down = 2, Left = 3
+		Up = 0, Right = 1, Down = 2, Left = 3, MAX = 3
 	};
 
 	struct Position {
 		uint16_t x, y;
+		bool operator<(const Position&) const;
 
 		Position() = default;
 		Position(uint16_t, uint16_t);
@@ -44,12 +49,11 @@ namespace messages {
 
 		Bomb() = default;
 		Bomb(Position, uint16_t);
-		Bomb(ServerConnection&);
 		void serialize(Buffer&) const;
 	};
 
 	enum struct ClientToServerType : uint8_t {
-		Join = 0, PlaceBomb = 1, PlaceBlock = 2, Move = 3
+		Join = 0, PlaceBomb = 1, PlaceBlock = 2, Move = 3, MAX = 3
 	};
 
 	struct ClientToServer {
@@ -62,7 +66,7 @@ namespace messages {
 	};
 
 	enum struct EventType : uint8_t {
-		BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, BlockPlaced = 3
+		BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, BlockPlaced = 3, MAX = 3
 	};
 
 	struct Event {
@@ -70,13 +74,15 @@ namespace messages {
 		Bomb::BombId bomb_id;
 		Player::PlayerId player_id;
 		Position position;
+		std::vector<Player::PlayerId> destroyed_players;
+		std::vector<Position> destroyed_blocks;
 
 		Event(ServerConnection&);
 		void serialize(Buffer&) const;
 	};
 
 	enum struct ServerToClientType : uint8_t {
-		Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4
+		Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4, MAX = 3
 	};
 
 	struct ServerToClient {
@@ -98,7 +104,7 @@ namespace messages {
 	};
 
 	enum struct GUIToClientType : uint8_t {
-		PlaceBomb = 0, PlaceBlock = 1, Move = 2
+		PlaceBomb = 0, PlaceBlock = 1, Move = 2, MAX = 2
 	};
 
 	struct GUIToClient {
@@ -110,7 +116,7 @@ namespace messages {
 	};
 
 	enum struct ClientToGUIType : uint8_t {
-		Lobby = 0, Game = 1
+		Lobby = 0, Game = 1, MAX = 1
 	};
 
 	struct ClientToGUI {
@@ -122,9 +128,9 @@ namespace messages {
 		uint16_t explosion_radius, bomb_timer;
 		std::unordered_map<Player::PlayerId, Player> players;
 		std::unordered_map<Player::PlayerId, Position> player_positions;
-		std::vector<Position> blocks;
-		std::vector<Bomb> bombs;
-		std::vector<Position> explosions;
+		std::set<Position> blocks;
+		std::unordered_map<Bomb::BombId, Bomb> bombs;
+		std::set<Position> explosions;
 		std::unordered_map<Player::PlayerId, Player::Score> scores;
 
 		ClientToGUI() = default;
