@@ -71,7 +71,7 @@ struct Event {
 };
 
 enum struct ServerToClientType : uint8_t {
-	Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4, MAX = 3
+	Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4, MAX = 4
 };
 
 struct ServerToClient {

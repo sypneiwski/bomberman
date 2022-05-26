@@ -70,6 +70,7 @@ Event::Event(ServerConnection &conn) {
 			position = Position(conn);
 			break;
 		case EventType::BombExploded:
+			conn.read32(bomb_id);
 			uint32_t len;
 			conn.read32(len);
 			for (uint32_t i = 0; i < len; i++) {
