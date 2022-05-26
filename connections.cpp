@@ -91,6 +91,7 @@ GUIConnection::GUIConnection(boost::asio::io_context &io_context, Options &optio
 
 void GUIConnection::write(Buffer &buffer) {
 	socket.send_to(boost::asio::buffer(buffer.get_data(), buffer.size()), endpoint);
+	buffer.clear();
 }
 
 void GUIConnection::read(void* buffer, size_t size) {
@@ -105,6 +106,12 @@ void GUIConnection::read(void* buffer, size_t size) {
 
 bool GUIConnection::has_more() const {
 	return ptr < end;
+}
+
+void GUIConnection::close() {
+	boost::system::error_code ec;
+	socket.shutdown(udp::socket::shutdown_both, ec);
+	socket.close();
 }
 
 ServerConnection::ServerConnection(boost::asio::io_context &io_context, Options &options)
@@ -122,8 +129,13 @@ ServerConnection::ServerConnection(boost::asio::io_context &io_context, Options 
 
 void ServerConnection::write(Buffer &buffer) {
 	boost::asio::write(socket, boost::asio::buffer(buffer.get_data(), buffer.size()));
+	buffer.clear();
 }
 
 void ServerConnection::read(void* buffer, size_t size) {
 	boost::asio::read(socket, boost::asio::buffer(buffer, size));
+}
+
+void ServerConnection::close() {
+	socket.close();
 }

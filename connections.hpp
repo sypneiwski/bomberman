@@ -54,6 +54,8 @@ public:
 
 	Connection& read_string(std::string&);
 
+	virtual void close() = 0;
+
 protected:
 	virtual void read(void*, size_t) = 0;	
 };
@@ -67,6 +69,8 @@ public:
 	void write(Buffer&) override;
 
 	bool has_more() const;
+
+	void close() override;
 
 private:
 	using udp = boost::asio::ip::udp;
@@ -92,6 +96,8 @@ public:
 	ServerConnection(boost::asio::io_context&, Options&);
 
 	void write(Buffer&) override;
+
+	void close() override;
 
 private:
 	using tcp = boost::asio::ip::tcp;

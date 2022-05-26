@@ -33,7 +33,7 @@ namespace {
 		GameState game_state{GameState::Lobby};
 		boost::asio::io_context io_context{};
 		std::string player_name;
-		ServerConnection serv_conn;
+		ServerConnection server_conn;
 		GUIConnection gui_conn;
 
 		void count_explosions(const Event &event, ClientToGUI& out) {
@@ -59,16 +59,15 @@ namespace {
 	public:
 		Client(Options &options)
 		: player_name(options.player_name),
-		  serv_conn(io_context, options), 
+		  server_conn(io_context, options), 
 		  gui_conn(io_context, options) {}
 
 		ServerToClient receive_from_server() {
-			ServerToClient in(serv_conn);
+			ServerToClient in(server_conn);
 			return in;
 		}  
 
-		std::optional<std::reference_wrapper<ClientToGUI>> 
-		process_server_message(const ServerToClient& in) {
+		ClientToGUI& process_server_message(const ServerToClient& in) {
 			static ClientToGUI out;
 			static std::set<Player::PlayerId> destroyed_players;
 			static std::set<Position> destroyed_blocks;
@@ -139,8 +138,6 @@ namespace {
 					break;
 			}
 			out.type = static_cast<ClientToGUIType>(game_state);
-			if (in.type == ServerToClientType::GameStarted)
-				return std::nullopt;
 			return out;
 		}
 
@@ -181,35 +178,45 @@ namespace {
 			static Buffer serialized;
 			message.serialize(serialized);
 			gui_conn.write(serialized);
-			serialized.clear();
 		}
 
 		void send_server_message(ClientToServer &message) {
 			static Buffer serialized;
 			message.serialize(serialized);
-			serv_conn.write(serialized);
-			serialized.clear();
+			server_conn.write(serialized);
+		}
+
+		void close_sockets() {
+			server_conn.close();
+			gui_conn.close();
 		}
 	};
 
-	void listen_for_server(Client &client) {
+	void handle_exception(std::exception &e) {
+		std::unique_lock lock(end_mutex);
+		if (end)
+			return;
+		end = true;
+		end_condition.notify_all();
+		std::cerr << "ERROR : " << e.what() << "\n";
+	}
+
+	void server_messages_handler(Client &client) {
 		for (;;) {
 			try {
 				ServerToClient in = client.receive_from_server();
-				auto out = client.process_server_message(in);
-				if (out)
-					client.send_gui_message(out->get());
+				ClientToGUI out = client.process_server_message(in);
+				if (in.type != ServerToClientType::GameStarted)
+					client.send_gui_message(out);
 			}
 			catch (std::exception &e) {
-				end = true;
-				end_condition.notify_all();
-				std::cerr << "ERROR : " << e.what() << "\n";
+				handle_exception(e);
 				return;
 			}
 		}
 	}
 
-	void listen_for_gui(Client &client) {
+	void gui_messages_handler(Client &client) {
 		for (;;) {
 			try {
 				GUIToClient in = client.receive_from_gui();
@@ -220,9 +227,7 @@ namespace {
 				continue;
 			}
 			catch (std::exception &e) {
-				end = true;
-				end_condition.notify_all();
-				std::cerr << "ERROR : " << e.what() << "\n";
+				handle_exception(e);
 				return;
 			}
 		}
@@ -233,12 +238,17 @@ int main(int argc, char *argv[]) {
 	try {
 		Options options = Options(argc, argv);
 		Client client(options);
-		std::thread server_listener(listen_for_server, std::ref(client));
-		std::thread gui_listener(&listen_for_gui, std::ref(client));
+		std::thread server_thread(server_messages_handler, std::ref(client));
+		std::thread gui_thread(gui_messages_handler, std::ref(client));
 
 		std::unique_lock lock(end_mutex);
 		end_condition.wait(lock, []{return end;});
+		end_mutex.unlock();
+
 		std::cerr << "closing connection\n";
+		client.close_sockets();
+		server_thread.join();
+		gui_thread.join();
 		exit(EXIT_FAILURE);
 	}
 	catch (std::exception &e) {
