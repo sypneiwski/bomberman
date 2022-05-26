@@ -8,7 +8,6 @@
 #include <endian.h>
 #include "program_options.hpp"
 
-//todo namespace
 class BufferError : public std::exception {
 public:
 	const char * what () const throw () {
@@ -43,21 +42,29 @@ private:
 	void write(T);
 };
 
+class Connection {
+public:
+	virtual void write(Buffer &buffer) = 0;
+
+	Connection& read8(uint8_t&);
+
+	Connection& read16(uint16_t&);
+
+	Connection& read32(uint32_t&);
+
+	Connection& read_string(std::string&);
+
+protected:
+	virtual void read(void*, size_t) = 0;	
+};
+
 class GUIReadError : public std::exception {};
 
-class GUIConnection {
+class GUIConnection : public Connection {
 public:
 	GUIConnection(boost::asio::io_context&, Options&);
 
-	void write(Buffer&);
-
-	GUIConnection& read8(uint8_t&);
-
-	GUIConnection& read16(uint16_t&);
-
-	GUIConnection& read32(uint32_t&);
-
-	GUIConnection& read_string(std::string&);
+	void write(Buffer&) override;
 
 	bool has_more() const;
 
@@ -70,8 +77,7 @@ private:
 	char data[MAX_UDP];
 	char *ptr, *end;
 
-	template<typename T>
-	void read(T*, size_t);
+	void read(void*, size_t);
 };
 
 class ServerReadError : public std::exception {
@@ -81,26 +87,17 @@ public:
 	}
 };
 
-class ServerConnection {
+class ServerConnection : public Connection {
 public:
 	ServerConnection(boost::asio::io_context&, Options&);
 
-	void write(Buffer&);
-
-	ServerConnection& read8(uint8_t&);
-
-	ServerConnection& read16(uint16_t&);
-
-	ServerConnection& read32(uint32_t&);
-
-	ServerConnection& read_string(std::string&);
+	void write(Buffer&) override;
 
 private:
 	using tcp = boost::asio::ip::tcp;
 	tcp::socket socket;
 
-	template<typename T>
-	void read(T*, size_t);
+	void read(void*, size_t);
 };
 
 #endif // CONNECTIONS_HPP

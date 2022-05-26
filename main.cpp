@@ -2,17 +2,27 @@
 #include <string>
 #include <exception>
 #include <boost/asio.hpp>
-#include <boost/thread.hpp>
 #include <optional>
 #include <set>
 #include <utility>
 #include <mutex>
+#include <condition_variable>
+#include <thread>
 #include <cassert>
 #include "program_options.hpp"
 #include "messages.hpp"
 #include "connections.hpp"
 
 namespace {
+	static std::mutex end_mutex;
+	static std::condition_variable end_condition;
+	static bool end{false};
+
+	/*
+	Client class, responsible for establishing connection with the server
+	and GUI, receiving and sending messages and keeping track of thestate
+	of the game. 
+	*/
 	class Client {
 	private:
 		enum struct GameState {
@@ -53,7 +63,6 @@ namespace {
 		  gui_conn(io_context, options) {}
 
 		ServerToClient receive_from_server() {
-			std::cout << "waiting...\n";
 			ServerToClient in(serv_conn);
 			return in;
 		}  
@@ -65,10 +74,8 @@ namespace {
 			static std::set<Position> destroyed_blocks;
 			const std::lock_guard<std::mutex> lock(state_mutex);
 			
-			std::cout << "received message from server of type: ";
 			switch (in.type) {
 				case ServerToClientType::Hello:
-					std::cout << "Hello\n";
 					out.server_name = in.server_name;
 					out.player_count = in.player_count;
 					out.size_x = in.size_x;
@@ -78,12 +85,10 @@ namespace {
 					out.bomb_timer = in.bomb_timer;
 					break;
 				case ServerToClientType::AcceptedPlayer:
-					std::cout << "AcceptedPlayer\n";
 					out.players[in.player_id] = in.player;
 					out.scores[in.player_id] = 0;
 					break;
 				case ServerToClientType::GameStarted:
-					std::cout << "GameStarted\n";
 					game_state = GameState::Game;
 					out.players = in.players;
 					out.scores.clear();
@@ -94,7 +99,6 @@ namespace {
 					out.bombs.clear();
 					break;
 				case ServerToClientType::Turn:
-					std::cout << "Turn\n";
 					out.explosions.clear();
 					destroyed_players.clear();
 					destroyed_blocks.clear();
@@ -127,10 +131,8 @@ namespace {
 						out.blocks.erase(position);
 					for (const Player::PlayerId &id : destroyed_players)
 						out.scores[id]++;
-					std::cout << "Processed turn\n";
 					break;
 				case ServerToClientType::GameEnded:
-					std::cout << "GameEneded\n";
 					game_state = GameState::Lobby;
 					out.players.clear();
 					out.scores.clear();
@@ -153,24 +155,19 @@ namespace {
 			static ClientToServer out;
 			const std::lock_guard<std::mutex> lock(state_mutex);
 
-			std::cout << "received message from gui of type: ";	
 			if (game_state == GameState::Lobby) {
-				std::cout << "Joining\n";
 				out.type = ClientToServerType::Join;
 				out.name = player_name;
 			}
 			else {
 				switch (in.type) {
 					case GUIToClientType::PlaceBomb:
-						std::cout << "PlaceBomb\n";
 						out.type = ClientToServerType::PlaceBomb;
 						break;
 					case GUIToClientType::PlaceBlock:
-						std::cout << "PlaceBlock\n";
 						out.type = ClientToServerType::PlaceBlock;
 						break;
 					case GUIToClientType::Move:
-						std::cout << "Move\n";
 						out.type = ClientToServerType::Move;
 						out.direction = in.direction;
 						break;
@@ -197,10 +194,17 @@ namespace {
 
 	void listen_for_server(Client &client) {
 		for (;;) {
-			ServerToClient in = client.receive_from_server();
-			auto out = client.process_server_message(in);
-			if (out)
-				client.send_gui_message(out->get());
+			try {
+				ServerToClient in = client.receive_from_server();
+				auto out = client.process_server_message(in);
+				if (out)
+					client.send_gui_message(out->get());
+			}
+			catch (std::exception &e) {
+				end_condition.notify_all();
+				std::cerr << "ERROR : " << e.what() << "\n";
+				return;
+			}
 		}
 	}
 
@@ -214,24 +218,25 @@ namespace {
 			catch (GUIReadError &e) {
 				continue;
 			}
+			catch (std::exception &e) {
+				end_condition.notify_all();
+				std::cerr << "ERROR : " << e.what() << "\n";
+				return;
+			}
 		}
 	}
-}
+} // anonymous namespace
 
 int main(int argc, char *argv[]) {
 	try {
 		Options options = Options(argc, argv);
-		std::cout << "Options parsed\n";
 		Client client(options);
-		std::cout << "Client created\n";
-		std::cout << "Starting threads\n";
-		boost::thread t1(boost::bind(&listen_for_server, std::ref(client)));
-		boost::thread t2(boost::bind(&listen_for_gui, std::ref(client)));
-		t1.join();
-		t2.join();
-	}
-	catch (ServerReadError &e) {
-		std::cerr << "ERROR : " << e.what() << "\n";
+		std::thread server_listener(listen_for_server, std::ref(client));
+		std::thread gui_listener(&listen_for_gui, std::ref(client));
+
+		std::unique_lock lock(end_mutex);
+		end_condition.wait(lock, []{return end;});
+		std::cerr << "closing connection\n";
 		exit(EXIT_SUCCESS);
 	}
 	catch (std::exception &e) {

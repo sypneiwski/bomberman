@@ -1,7 +1,5 @@
 #include <string>
 #include <vector>
-#include <endian.h>
-#include <iostream> // debug
 #include "messages.hpp"
 #include "connections.hpp"
 

@@ -1,4 +1,3 @@
-#include <iostream>
 #include <string>
 #include <exception>
 #include <boost/bind/bind.hpp>
@@ -53,6 +52,33 @@ void Buffer::clear() {
 	ptr = data;
 }
 
+Connection& Connection::read8(uint8_t &number) {
+	read(&number, sizeof(number));
+	return *this;
+}
+
+Connection& Connection::read16(uint16_t &number) {
+	read(&number, sizeof(number));
+	number = be16toh(number);
+	return *this;
+}
+
+Connection& Connection::read32(uint32_t &number) {
+	read(&number, sizeof(number));
+	number = be32toh(number);
+	return *this;
+}
+
+Connection& Connection::read_string(std::string &buffer) {
+	uint8_t len;
+	read8(len);
+	char ret[len + 1];
+	memset(ret, 0, len + 1);
+	read(ret, len);
+	buffer = std::string(ret);
+	return *this;
+}
+
 GUIConnection::GUIConnection(boost::asio::io_context &io_context, Options &options)
 		: socket(io_context, udp::endpoint(udp::v6(), options.port)), ptr(data), end(data) {
 	udp::resolver resolver(io_context);
@@ -64,19 +90,10 @@ GUIConnection::GUIConnection(boost::asio::io_context &io_context, Options &optio
 }
 
 void GUIConnection::write(Buffer &buffer) {
-	//debug
-	size_t s = buffer.size();
-	char* d = buffer.get_data();
-	std::cout << "printing buffer\n[";
-	for (size_t i = 0; i < s; i++)
-		std::cout << (int) ((uint8_t) d[i]) << ", ";
-	std::cout << "]\n";	
-	//debug
 	socket.send_to(boost::asio::buffer(buffer.get_data(), buffer.size()), endpoint);
 }
 
-template<typename T>
-void GUIConnection::read(T* buffer, size_t size) {
+void GUIConnection::read(void* buffer, size_t size) {
 	while (ptr + size > end) {
 		size_t len = socket.receive(boost::asio::buffer(data, MAX_UDP));
 		end = data + len;
@@ -84,23 +101,6 @@ void GUIConnection::read(T* buffer, size_t size) {
 	}
 	memcpy(buffer, ptr, size);
 	ptr += size;
-}
-
-GUIConnection& GUIConnection::read8(uint8_t &number) {
-	read(&number, sizeof(number));
-	return *this;
-}
-
-GUIConnection& GUIConnection::read16(uint16_t &number) {
-	read(&number, sizeof(number));
-	number = be16toh(number);
-	return *this;
-}
-
-GUIConnection& GUIConnection::read32(uint32_t &number) {
-	read(&number, sizeof(number));
-	number = be32toh(number);
-	return *this;
 }
 
 bool GUIConnection::has_more() const {
@@ -124,37 +124,6 @@ void ServerConnection::write(Buffer &buffer) {
 	boost::asio::write(socket, boost::asio::buffer(buffer.get_data(), buffer.size()));
 }
 
-template<typename T>
-void ServerConnection::read(T* buffer, size_t size) {
-	boost::system::error_code ec;
-	boost::asio::read(socket, boost::asio::buffer(buffer, size), ec);
-	if (ec)
-		throw std::runtime_error("Receiving data from server failed");
-}
-
-ServerConnection& ServerConnection::read8(uint8_t &number) {
-	read(&number, sizeof(number));
-	return *this;
-}
-
-ServerConnection& ServerConnection::read16(uint16_t &number) {
-	read(&number, sizeof(number));
-	number = be16toh(number);
-	return *this;
-}
-
-ServerConnection& ServerConnection::read32(uint32_t &number) {
-	read(&number, sizeof(number));
-	number = be32toh(number);
-	return *this;
-}
-
-ServerConnection& ServerConnection::read_string(std::string &buffer) {
-	uint8_t len;
-	read8(len);
-	char ret[len + 1];
-	memset(ret, 0, len + 1);
-	read(ret, len);
-	buffer = std::string(ret);
-	return *this;
+void ServerConnection::read(void* buffer, size_t size) {
+	boost::asio::read(socket, boost::asio::buffer(buffer, size));
 }
