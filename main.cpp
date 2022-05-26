@@ -201,6 +201,7 @@ namespace {
 					client.send_gui_message(out->get());
 			}
 			catch (std::exception &e) {
+				end = true;
 				end_condition.notify_all();
 				std::cerr << "ERROR : " << e.what() << "\n";
 				return;
@@ -219,6 +220,7 @@ namespace {
 				continue;
 			}
 			catch (std::exception &e) {
+				end = true;
 				end_condition.notify_all();
 				std::cerr << "ERROR : " << e.what() << "\n";
 				return;
@@ -237,7 +239,7 @@ int main(int argc, char *argv[]) {
 		std::unique_lock lock(end_mutex);
 		end_condition.wait(lock, []{return end;});
 		std::cerr << "closing connection\n";
-		exit(EXIT_SUCCESS);
+		exit(EXIT_FAILURE);
 	}
 	catch (std::exception &e) {
 		std::cerr << "ERROR : " << e.what() << "\n";

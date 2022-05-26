@@ -1,1 +1,1 @@
-./robots-client -d 0.0.0.0:1233 -n Mat3usz -p 1234 -s students.mimuw.edu.pl:10012
+./robots-client -d 0.0.0.0:1233 -n Mat3usz -p 1234 -s students.mimuw.edu.pl:12333
