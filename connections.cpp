@@ -81,15 +81,17 @@ Connection& Connection::read_string(std::string &buffer) {
 
 UDPConnection::UDPConnection(
   boost::asio::io_context &io_context, 
-  Options &options)
-  : socket(io_context, udp::endpoint(udp::v6(), options.port)), 
+  uint16_t &local_port,
+  std::string &remote_address,
+  std::string &remote_port)
+  : socket(io_context, udp::endpoint(udp::v6(), local_port)), 
     ptr(data), 
     end(data) {
   udp::resolver resolver(io_context);
   boost::system::error_code ec;
   auto endpoints = resolver.resolve(
-    options.gui_address, 
-    options.gui_port, 
+    remote_address, 
+    remote_port, 
     ec
   );
   if (ec)
@@ -128,13 +130,14 @@ void UDPConnection::close() {
 
 TCPConnection::TCPConnection(
   boost::asio::io_context &io_context, 
-  Options &options)
+  std::string &address,
+  std::string &port)
   : socket(io_context) {
   tcp::resolver resolver(io_context);
   boost::system::error_code ec;
   auto endpoints = resolver.resolve(
-    options.server_address,
-    options.server_port, 
+    address,
+    port,
     ec
   );
   if (ec)

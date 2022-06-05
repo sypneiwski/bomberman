@@ -4,6 +4,7 @@
 #include <iostream>
 #include <exception>
 #include <cstdint>
+#include <chrono>
 #include "program_options.hpp"
 
 // Function retrieves the port from a valid address.
@@ -21,18 +22,26 @@ bool resolve_address(
   return true;
 }
 
-Options::Options(int argc, char* argv[]) {
+// Function checks if the provided value of an options is valid.
+template<typename T>
+void bound_check(int64_t value, T &option, std::string name) {
+  if (value <= 0 || value > std::numeric_limits<T>::max())
+    throw OptionsError("Please provide a valid " + name + " value");
+  option = (T) value;  
+}
+
+ClientOptions::ClientOptions(int argc, char* argv[]) {
   namespace po = boost::program_options;
   po::options_description desc("Allowed options");
   std::string gui_address_, server_address_;
   int64_t port_;
   desc.add_options()
-      ("gui-address,d", po::value<std::string>(&gui_address_)->required(), "gui address")
-      ("help,h", "produce help message")
-      ("player-name,n", po::value<std::string>(&player_name)->required(), "player name")
-      ("port,p", po::value<int64_t>(&port_)->required(), "port")
-      ("server-address,s", po::value<std::string>(&server_address_)->required(), "server address")
-      ;
+    ("gui-address,d", po::value<std::string>(&gui_address_)->required(), "gui address")
+    ("help,h", "produce help message")
+    ("player-name,n", po::value<std::string>(&player_name)->required(), "player name")
+    ("port,p", po::value<int64_t>(&port_)->required(), "port")
+    ("server-address,s", po::value<std::string>(&server_address_)->required(), "server address")
+    ;
   po::variables_map vm;
   po::store(po::parse_command_line(argc, argv, desc), vm);
 
@@ -47,7 +56,53 @@ Options::Options(int argc, char* argv[]) {
     throw OptionsError("Please provide a valid gui address");
   if (!resolve_address(server_address_, &server_address, &server_port))
     throw OptionsError("Please provide a valid server address");
-  if (port_ <= 0 || port_ > std::numeric_limits<uint16_t>::max())
-    throw OptionsError("Please provide a valid port value");
-  port = (uint16_t) port_;
+  bound_check(port_, port, "port");
+}
+
+ServerOptions::ServerOptions(int argc, char* argv[]) {
+  namespace po = boost::program_options;
+  po::options_description desc("Allowed options");
+  int64_t bomb_timer_, players_count_, turn_duration_,
+          explosion_radius_, initial_blocks_, game_length_,
+          port_, seed_, size_x_, size_y_;
+  seed = static_cast<uint32_t>(
+    std::chrono::system_clock::now().time_since_epoch().count()
+  );  
+        
+  desc.add_options()
+    ("bomb-timer,b", po::value<int64_t>(&bomb_timer_)->required(), "bomb timer")
+    ("players-count,c", po::value<int64_t>(&players_count_)->required(), "players count")
+    ("turn-duration,d", po::value<int64_t>(&turn_duration_)->required(), "turn duration")
+    ("explosion-radius,e", po::value<int64_t>(&explosion_radius_)->required(), "explosion radius")
+    ("help,h", "produce help message")
+    ("initial-blocks,k", po::value<int64_t>(&initial_blocks_)->required(), "initial blocks")
+    ("game-length,l", po::value<int64_t>(&game_length_)->required(), "game length")
+    ("server-name,n", po::value<std::string>(&server_name)->required(), "server name")
+    ("port,p", po::value<int64_t>(&port_)->required(), "port")
+    ("seed,s", po::value<int64_t>(&seed_)->default_value(seed), "seed")
+    ("size-x,x", po::value<int64_t>(&size_x_), "size x")
+    ("size-y,y", po::value<int64_t>(&size_y_), "size y")
+    ;
+  po::variables_map vm;
+  po::store(po::parse_command_line(argc, argv, desc), vm);
+
+  if (vm.count("help")) {
+    // Print the help message.
+    std::cout << desc << "\n";
+    exit(EXIT_SUCCESS);
+  }
+  po::notify(vm);
+
+  bound_check(bomb_timer_, bomb_timer, std::string("bomb timer"));
+  bound_check(players_count_, players_count, std::string("players count"));  
+  bound_check(explosion_radius_, explosion_radius, std::string("explosion radius"));
+  bound_check(initial_blocks_, initial_blocks, std::string("initial blocks"));
+  bound_check(game_length_, game_length, std::string("game length"));
+  bound_check(port_, port, std::string("port"));
+  bound_check(seed_, seed, std::string("seed"));
+  bound_check(size_x_, size_x, std::string("size x"));
+  bound_check(size_y_, size_y, std::string("size y"));
+  if (turn_duration_ <= 0)
+    throw OptionsError("Please provide a valid turn duration value");
+  turn_duration = turn_duration_;  
 }

@@ -6,7 +6,6 @@
 #include <boost/bind/bind.hpp>
 #include <boost/asio.hpp>
 #include <endian.h>
-#include "program_options.hpp"
 
 class BufferError : public std::exception {
 public:
@@ -69,7 +68,12 @@ protected:
 // Class wrapping the boost UDP socket.
 class UDPConnection : public Connection {
 public:
-  UDPConnection(boost::asio::io_context&, Options&);
+  UDPConnection(
+    boost::asio::io_context&, 
+    uint16_t&, 
+    std::string&, 
+    std::string&
+  );
 
   void write(Buffer&) override;
 
@@ -92,7 +96,7 @@ private:
 // Class wrapping the boost TCP socket
 class TCPConnection : public Connection {
 public:
-  TCPConnection(boost::asio::io_context&, Options&);
+  TCPConnection(boost::asio::io_context&, std::string&, std::string&);
 
   void write(Buffer&) override;
 

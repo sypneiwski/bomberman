@@ -20,10 +20,9 @@ namespace {
   static std::condition_variable end_condition;
   static bool end{false};
 
-  
   // Client class, responsible for establishing connection with the server
   // and GUI, receiving and sending messages and keeping track of thestate
-  // of the game. 
+  // of the game.
   class Client {
   private:
     // Current game state.
@@ -56,16 +55,15 @@ namespace {
             break;
           x += side.first;
           y += side.second;
-          if (x == -1 || x == out.size_x || 
-            y == -1 || y == out.size_y)
-            break;	
+          if (x == -1 || x == out.size_x || y == -1 || y == out.size_y)
+            break;
         }
       }
     }
 
     // Helper function to process one turn's events.
     void process_events(
-      const std::vector<Event> &events, 
+      const std::vector<Event> &events,
       ClientToGUI& out,
       std::set<Player::PlayerId> &destroyed_players,
       std::set<Position> &destroyed_blocks
@@ -73,7 +71,7 @@ namespace {
       for (const Event &event : events) {
         switch (event.type) {
           case EventType::BombPlaced:
-            out.bombs[event.bomb_id] = 
+            out.bombs[event.bomb_id] =
               Bomb(event.position, out.bomb_timer);
             break;
           case EventType::BombExploded:
@@ -88,21 +86,21 @@ namespace {
             out.player_positions[event.player_id] = event.position;
             break;
           case EventType::BlockPlaced:
-            out.blocks.insert(event.position);		
+            out.blocks.insert(event.position);
         }
       }
     }
 
   public:
-    Client(Options &options)
+    Client(ClientOptions &options)
     : player_name(options.player_name),
-      server_conn(io_context, options), 
-      gui_conn(io_context, options) {}
+      server_conn(io_context, options.server_address, options.server_port),
+      gui_conn(io_context, options.port, options.gui_address, options.gui_port) {}
 
     ServerToClient receive_from_server() {
       ServerToClient in(server_conn);
       return in;
-    }  
+    }
 
     ClientToGUI& process_server_message(const ServerToClient& in) {
       // The `out` message will statically hold all information
@@ -112,7 +110,7 @@ namespace {
       static std::set<Position> destroyed_blocks;
       // Guards access to the game_state variable.
       const std::lock_guard<std::mutex> lock(state_mutex);
-      
+
       switch (in.type) {
         case ServerToClientType::Hello:
           out.server_name = in.server_name;
@@ -146,7 +144,7 @@ namespace {
           // Decrease bomb timers
           for (auto &[id, bomb] : out.bombs)
             bomb.timer--;
-          
+
           // Process this turn's events.
           process_events(in.events, out, destroyed_players, destroyed_blocks);
 
@@ -268,7 +266,7 @@ namespace {
 
 int main(int argc, char *argv[]) {
   try {
-    Options options = Options(argc, argv);
+    ClientOptions options = ClientOptions(argc, argv);
     Client client(options);
     // Starting to listen for messages.
     std::thread server_thread(server_messages_handler, std::ref(client));
