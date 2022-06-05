@@ -202,7 +202,7 @@ void ClientToGUI::serialize(Buffer &buff) const {
       buff.write32((uint32_t) scores.size());
       for (const auto &[id, score] : scores) {
         buff.write8(static_cast<uint8_t>(id))
-          .write32(static_cast<uint32_t>(score));
+            .write32(static_cast<uint32_t>(score));
       }	
   }
 }

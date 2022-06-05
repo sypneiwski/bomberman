@@ -20,6 +20,7 @@ public:
 class Buffer {
 public:
   static constexpr size_t BUFFER_SIZE = 65535;
+  
   Buffer();
 
   Buffer &write8(uint8_t);
