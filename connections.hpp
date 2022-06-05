@@ -15,6 +15,8 @@ public:
 	}
 };
 
+// Helper class for serializing outgoing messages.
+// The writeX functions convert binary numbers to network order.
 class Buffer {
 public:
 	static constexpr size_t BUFFER_SIZE = 65535;
@@ -42,6 +44,9 @@ private:
 	void write(T);
 };
 
+// Abstract base class for connections.
+// Connection classes provide the ability to read from
+// and write to sockets.
 class Connection {
 public:
 	virtual void write(Buffer &buffer) = 0;
@@ -60,11 +65,10 @@ protected:
 	virtual void read(void*, size_t) = 0;	
 };
 
-class GUIReadError : public std::exception {};
-
-class GUIConnection : public Connection {
+// Class wrapping the boost UDP socket.
+class UDPConnection : public Connection {
 public:
-	GUIConnection(boost::asio::io_context&, Options&);
+	UDPConnection(boost::asio::io_context&, Options&);
 
 	void write(Buffer&) override;
 
@@ -81,19 +85,13 @@ private:
 	char data[MAX_UDP];
 	char *ptr, *end;
 
-	void read(void*, size_t);
+	void read(void*, size_t) override;
 };
 
-class ServerReadError : public std::exception {
+// Class wrapping the boost TCP socket
+class TCPConnection : public Connection {
 public:
-	const char * what () const throw () {
-		return "Unable to parse message from server.";
-	}
-};
-
-class ServerConnection : public Connection {
-public:
-	ServerConnection(boost::asio::io_context&, Options&);
+	TCPConnection(boost::asio::io_context&, Options&);
 
 	void write(Buffer&) override;
 
@@ -103,7 +101,7 @@ private:
 	using tcp = boost::asio::ip::tcp;
 	tcp::socket socket;
 
-	void read(void*, size_t);
+	void read(void*, size_t) override;
 };
 
 #endif // CONNECTIONS_HPP

@@ -1,9 +1,14 @@
 CC = g++
-CFLAGS = -Wall -Wextra -std=c++17 -I ../boost_1_79_0
-LIBS = -L/usr/local/lib -lboost_program_options -pthread -lboost_system
+CFLAGS = -std=gnu++20 -Wall -Wextra -Wconversion -Werror -O2
+LIBS = -lboost_program_options -pthread -lboost_system
 
-robots-client: main.o program_options.o messages.o connections.o
-	$(CC) $(CFLAGS) -o $@ main.o program_options.o messages.o connections.o $(LIBS)
+.PHONY: clean
+
+robots-client: robots-client.o program_options.o messages.o connections.o
+	$(CC) $(CFLAGS) -o $@ robots-client.o program_options.o messages.o connections.o $(LIBS)
 
 .cpp.o:
 	$(CC) $(CFLAGS) -c $<
+
+clean:
+	rm -f robots-client *.o

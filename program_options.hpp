@@ -8,12 +8,13 @@ public:
 	OptionsError(std::string const& e) : std::invalid_argument(e) {}
 };
 
+// Struct for parsing and storing all options from the commandline.
 struct Options {
 	std::string gui_address,
-				gui_port,
-				player_name,
-				server_address,
-				server_port;
+	            gui_port,
+				      player_name,
+				      server_address,
+				      server_port;
 	uint16_t port;
 	Options(int, char*[]);
 };

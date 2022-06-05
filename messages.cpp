@@ -11,27 +11,27 @@ bool Position::operator<(const Position &other) const {
 
 Position::Position(uint16_t x, uint16_t y) : x(x), y(y) {}
 
-Position::Position(ServerConnection &conn) {
+Position::Position(Connection &conn) {
 	conn.read16(x)
-		.read16(y);
+	    .read16(y);
 }
 
 void Position::serialize(Buffer &buff) const {
 	buff.write16(x)
-		.write16(y);
+		  .write16(y);
 }
 
 Player::Player(std::string name, std::string address)
 : name(name), address(address) {}
 
-Player::Player(ServerConnection &conn) {
+Player::Player(Connection &conn) {
 	conn.read_string(name)
-		.read_string(address);
+		  .read_string(address);
 }
 
 void Player::serialize(Buffer &buff) const {
 	buff.write_string(name)
-		.write_string(address);
+		  .write_string(address);
 }
 
 Bomb::Bomb(Position position, uint16_t timer) 
@@ -56,7 +56,7 @@ void ClientToServer::serialize(Buffer &buff) const {
 	}
 }
 
-Event::Event(ServerConnection &conn) {
+Event::Event(Connection &conn) {
 	uint8_t u8;
 	conn.read8(u8);
 	if (u8 > static_cast<uint8_t>(EventType::MAX))
@@ -91,7 +91,7 @@ Event::Event(ServerConnection &conn) {
 	}
 }
 
-ServerToClient::ServerToClient(ServerConnection &conn) {
+ServerToClient::ServerToClient(Connection &conn) {
 	uint8_t u8;
 	conn.read8(u8);
 	if (u8 > static_cast<uint8_t>(ServerToClientType::MAX))
@@ -101,12 +101,12 @@ ServerToClient::ServerToClient(ServerConnection &conn) {
 	switch (type) {
 		case ServerToClientType::Hello:
 			conn.read_string(server_name)
-				.read8(player_count)
-				.read16(size_x)
-				.read16(size_y)
-				.read16(game_length)
-				.read16(explosion_radius)
-				.read16(bomb_timer);
+				  .read8(player_count)
+				  .read16(size_x)
+				  .read16(size_y)
+				  .read16(game_length)
+				  .read16(explosion_radius)
+				  .read16(bomb_timer);
 			break;
 		case ServerToClientType::AcceptedPlayer:
 			conn.read8(player_id);
@@ -140,7 +140,7 @@ ServerToClient::ServerToClient(ServerConnection &conn) {
 	}
 }
 
-GUIToClient::GUIToClient(GUIConnection &conn) {
+GUIToClient::GUIToClient(Connection &conn) {
 	uint8_t u8;
 	conn.read8(u8);
 	if (u8 > static_cast<uint8_t>(GUIToClientType::MAX))
@@ -160,16 +160,16 @@ GUIToClient::GUIToClient(GUIConnection &conn) {
 
 void ClientToGUI::serialize(Buffer &buff) const {
 	buff.write8(static_cast<uint8_t>(type))
-		.write_string(server_name);
+		  .write_string(server_name);
 	switch (type) {
 		case ClientToGUIType::Lobby:
 			buff.write8(player_count)
-				.write16(size_x)
-				.write16(size_y)
-				.write16(game_length)
-				.write16(explosion_radius)
-				.write16(bomb_timer)
-				.write32(players.size());
+				  .write16(size_x)
+				  .write16(size_y)
+				  .write16(game_length)
+				  .write16(explosion_radius)
+				  .write16(bomb_timer)
+				  .write32((uint32_t) players.size());
 			for (const auto &[id, player] : players) {
 				buff.write8(static_cast<uint8_t>(id));
 				player.serialize(buff);
@@ -177,29 +177,29 @@ void ClientToGUI::serialize(Buffer &buff) const {
 			break;
 		case ClientToGUIType::Game:
 			buff.write16(size_x)
-				.write16(size_y)
-				.write16(game_length)
-				.write16(turn)
-				.write32(players.size());
+				  .write16(size_y)
+				  .write16(game_length)
+				  .write16(turn)
+				  .write32((uint32_t) players.size());
 			for (const auto &[id, player] : players) {
 				buff.write8(static_cast<uint8_t>(id));
 				player.serialize(buff);
 			}
-			buff.write32(player_positions.size());
+			buff.write32((uint32_t) player_positions.size());
 			for (const auto &[id, position] : player_positions) {
 				buff.write8(static_cast<uint8_t>(id));
 				position.serialize(buff);
 			}
-			buff.write32(blocks.size());
+			buff.write32((uint32_t) blocks.size());
 			for (const Position &position : blocks)
 				position.serialize(buff);
-			buff.write32(bombs.size());
+			buff.write32((uint32_t) bombs.size());
 			for (const auto &[id, bomb] : bombs)
 				bomb.serialize(buff);
-			buff.write32(explosions.size());
+			buff.write32((uint32_t) explosions.size());
 			for (const Position &position : explosions)
 				position.serialize(buff);
-			buff.write32(scores.size());
+			buff.write32((uint32_t) scores.size());
 			for (const auto &[id, score] : scores) {
 				buff.write8(static_cast<uint8_t>(id))
 					.write32(static_cast<uint32_t>(score));

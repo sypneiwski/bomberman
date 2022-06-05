@@ -7,6 +7,17 @@
 #include <set>
 #include "connections.hpp"
 
+// This file includes declarations for structures used for
+// serializing and deserializing messages.
+class GUIReadError : public std::exception {};
+
+class ServerReadError : public std::exception {
+public:
+	const char * what () const throw () {
+		return "Unable to parse message";
+	}
+};
+
 enum struct Direction : uint8_t {
 	Up = 0, Right = 1, Down = 2, Left = 3, MAX = 3
 };
@@ -17,7 +28,7 @@ struct Position {
 
 	Position() = default;
 	Position(uint16_t, uint16_t);
-	Position(ServerConnection&);
+	Position(Connection&);
 	void serialize(Buffer&) const;
 };
 
@@ -28,7 +39,7 @@ struct Player {
 
 	Player() = default;
 	Player(std::string, std::string);
-	Player(ServerConnection&);
+	Player(Connection&);
 	void serialize(Buffer&) const;
 };
 
@@ -46,6 +57,7 @@ enum struct ClientToServerType : uint8_t {
 	Join = 0, PlaceBomb = 1, PlaceBlock = 2, Move = 3, MAX = 3
 };
 
+// Struct holding data for messages to the server.
 struct ClientToServer {
 	ClientToServerType type;
 	std::string name;
@@ -56,7 +68,8 @@ struct ClientToServer {
 };
 
 enum struct EventType : uint8_t {
-	BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, BlockPlaced = 3, MAX = 3
+	BombPlaced = 0, BombExploded = 1, PlayerMoved = 2, 
+	BlockPlaced = 3, MAX = 3
 };
 
 struct Event {
@@ -67,13 +80,15 @@ struct Event {
 	std::vector<Player::PlayerId> destroyed_players;
 	std::vector<Position> destroyed_blocks;
 
-	Event(ServerConnection&);
+	Event(Connection&);
 };
 
 enum struct ServerToClientType : uint8_t {
-	Hello = 0, AcceptedPlayer = 1, GameStarted = 2, Turn = 3, GameEnded = 4, MAX = 4
+	Hello = 0, AcceptedPlayer = 1, GameStarted = 2, 
+	Turn = 3, GameEnded = 4, MAX = 4
 };
 
+// Struct holding data for messages from the server.
 struct ServerToClient {
 	ServerToClientType type;
 	std::string server_name;
@@ -88,24 +103,26 @@ struct ServerToClient {
 	std::vector<Event> events;
 	std::unordered_map<Player::PlayerId, Player::Score> scores;
 
-	ServerToClient(ServerConnection&);
+	ServerToClient(Connection&);
 };
 
 enum struct GUIToClientType : uint8_t {
 	PlaceBomb = 0, PlaceBlock = 1, Move = 2, MAX = 2
 };
 
+// Struct holding data for messages from GUI.
 struct GUIToClient {
 	GUIToClientType type;
 	Direction direction;
 
-	GUIToClient(GUIConnection&);
+	GUIToClient(Connection&);
 };
 
 enum struct ClientToGUIType : uint8_t {
 	Lobby = 0, Game = 1, MAX = 1
 };
 
+// Struct holding data for messages to GUI.
 struct ClientToGUI {
 	ClientToGUIType type;
 	std::string server_name;

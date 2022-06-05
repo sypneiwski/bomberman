@@ -62,6 +62,37 @@ namespace {
 				}
 			}
 		}
+
+    // Helper function to process one turn's events.
+    void process_events(
+      const std::vector<Event> &events, 
+      ClientToGUI& out,
+      std::set<Player::PlayerId> &destroyed_players,
+      std::set<Position> &destroyed_blocks
+      ) {
+      for (const Event &event : events) {
+        switch (event.type) {
+          case EventType::BombPlaced:
+            out.bombs[event.bomb_id] = 
+              Bomb(event.position, out.bomb_timer);
+            break;
+          case EventType::BombExploded:
+            calculate_explosions(event, out);
+            for (const Position &position : event.destroyed_blocks)
+              destroyed_blocks.insert(position);
+            for (const Player::PlayerId &id : event.destroyed_players)
+              destroyed_players.insert(id);
+            out.bombs.erase(event.bomb_id);
+            break;
+          case EventType::PlayerMoved:
+            out.player_positions[event.player_id] = event.position;
+            break;
+          case EventType::BlockPlaced:
+            out.blocks.insert(event.position);		
+        }
+      }
+    }
+
 	public:
 		Client(Options &options)
 		: player_name(options.player_name),
@@ -111,31 +142,14 @@ namespace {
 					destroyed_players.clear();
 					destroyed_blocks.clear();
 					out.turn = in.turn;
+
+          // Decrease bomb timers
 					for (auto &[id, bomb] : out.bombs)
 						bomb.timer--;
-
+          
 					// Process this turn's events.
-					for (const Event &event : in.events) {
-						switch (event.type) {
-							case EventType::BombPlaced:
-								out.bombs[event.bomb_id] = 
-									Bomb(event.position, out.bomb_timer);
-								break;
-							case EventType::BombExploded:
-								calculate_explosions(event, out);
-								for (const Position &position : event.destroyed_blocks)
-									destroyed_blocks.insert(position);
-								for (const Player::PlayerId &id : event.destroyed_players)
-									destroyed_players.insert(id);
-								out.bombs.erase(event.bomb_id);
-								break;
-							case EventType::PlayerMoved:
-								out.player_positions[event.player_id] = event.position;
-								break;
-							case EventType::BlockPlaced:
-								out.blocks.insert(event.position);		
-						}
-					}
+					process_events(in.events, out, destroyed_players, destroyed_blocks);
+
 					// Calculate the scores for this turn and erase destroyed
 					// blocks.
 					for (const Position &position : destroyed_blocks)

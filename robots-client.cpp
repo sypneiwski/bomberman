@@ -14,17 +14,19 @@
 #include "connections.hpp"
 
 namespace {
+	// Mutex and conditional variable used for safely closing
+	// all connections in case of an error.
 	static std::mutex end_mutex;
 	static std::condition_variable end_condition;
 	static bool end{false};
 
-	/*
-	Client class, responsible for establishing connection with the server
-	and GUI, receiving and sending messages and keeping track of thestate
-	of the game. 
-	*/
+	
+	// Client class, responsible for establishing connection with the server
+	// and GUI, receiving and sending messages and keeping track of thestate
+	// of the game. 
 	class Client {
 	private:
+		// Current game state.
 		enum struct GameState {
 			Lobby = 0, Game = 1
 		};
@@ -33,10 +35,12 @@ namespace {
 		GameState game_state{GameState::Lobby};
 		boost::asio::io_context io_context{};
 		std::string player_name;
-		ServerConnection server_conn;
-		GUIConnection gui_conn;
+		TCPConnection server_conn;
+		UDPConnection gui_conn;
 
-		void count_explosions(const Event &event, ClientToGUI& out) {
+		// Helper function to find all squares on the map
+		// that have exploded in the current event.
+		void calculate_explosions(const Event &event, ClientToGUI& out) {
 			assert(event.type == EventType::BombExploded);
 			static std::vector<std::pair<int32_t,int32_t>> sides = {
 				{1,0}, {0,1}, {-1, 0}, {0, -1}
@@ -45,13 +49,15 @@ namespace {
 				Position p = out.bombs[event.bomb_id].position;
 				int32_t x = p.x, y = p.y;
 				for (uint16_t i = 0; i <= out.explosion_radius; i++) {
-					p = Position(x, y);
+					p = Position((uint16_t) x, (uint16_t) y);
 					out.explosions.insert(p);
+					// If the explosion reaches a block, it stops.
 					if (out.blocks.count(p) == 1) // change to contains
 						break;
 					x += side.first;
 					y += side.second;
-					if (x == -1 || x == out.size_x || y == -1 || y == out.size_y)
+					if (x == -1 || x == out.size_x || 
+						y == -1 || y == out.size_y)
 						break;	
 				}
 			}
@@ -68,9 +74,12 @@ namespace {
 		}  
 
 		ClientToGUI& process_server_message(const ServerToClient& in) {
+			// The `out` message will statically hold all information
+			// about the game state that gui will use.
 			static ClientToGUI out;
 			static std::set<Player::PlayerId> destroyed_players;
 			static std::set<Position> destroyed_blocks;
+			// Guards access to the game_state variable.
 			const std::lock_guard<std::mutex> lock(state_mutex);
 			
 			switch (in.type) {
@@ -109,10 +118,11 @@ namespace {
 					for (const Event &event : in.events) {
 						switch (event.type) {
 							case EventType::BombPlaced:
-								out.bombs[event.bomb_id] = Bomb(event.position, out.bomb_timer);
+								out.bombs[event.bomb_id] = 
+									Bomb(event.position, out.bomb_timer);
 								break;
 							case EventType::BombExploded:
-								count_explosions(event, out);
+								calculate_explosions(event, out);
 								for (const Position &position : event.destroyed_blocks)
 									destroyed_blocks.insert(position);
 								for (const Player::PlayerId &id : event.destroyed_players)
@@ -120,12 +130,14 @@ namespace {
 								out.bombs.erase(event.bomb_id);
 								break;
 							case EventType::PlayerMoved:
-								out.player_positions[event.player_id] = event.position;	
+								out.player_positions[event.player_id] = event.position;
 								break;
 							case EventType::BlockPlaced:
 								out.blocks.insert(event.position);		
 						}
 					}
+					// Calculate the scores for this turn and erase destroyed
+					// blocks.
 					for (const Position &position : destroyed_blocks)
 						out.blocks.erase(position);
 					for (const Player::PlayerId &id : destroyed_players)
@@ -150,8 +162,11 @@ namespace {
 
 		ClientToServer& process_gui_message(const GUIToClient& in) {
 			static ClientToServer out;
+			// Guards access to the game state variable.
 			const std::lock_guard<std::mutex> lock(state_mutex);
 
+			// If the game is in lobby state, send a JOIN
+			// message to the server regardless of `in` type.
 			if (game_state == GameState::Lobby) {
 				out.type = ClientToServerType::Join;
 				out.name = player_name;
@@ -192,6 +207,8 @@ namespace {
 		}
 	};
 
+	// Handles exception in the worker threads
+	// by waking up the main thread.
 	void handle_exception(std::exception &e) {
 		std::unique_lock lock(end_mutex);
 		if (end)
@@ -224,6 +241,7 @@ namespace {
 				client.send_server_message(out);
 			}
 			catch (GUIReadError &e) {
+				// If the message is corrupted, ignore it.
 				continue;
 			}
 			catch (std::exception &e) {
@@ -238,9 +256,11 @@ int main(int argc, char *argv[]) {
 	try {
 		Options options = Options(argc, argv);
 		Client client(options);
+		// Starting to listen for messages.
 		std::thread server_thread(server_messages_handler, std::ref(client));
 		std::thread gui_thread(gui_messages_handler, std::ref(client));
 
+		// Waiting for any exceptions in the threads.
 		std::unique_lock lock(end_mutex);
 		end_condition.wait(lock, []{return end;});
 		end_mutex.unlock();
