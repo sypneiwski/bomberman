@@ -148,6 +148,9 @@ TCPConnection::TCPConnection(
     throw std::invalid_argument("Could not connect to server");
 }
 
+TCPConnection::TCPConnection(tcp::socket &&socket)
+: socket(std::move(socket)) {}
+
 void TCPConnection::write(Buffer &buffer) {
   boost::asio::write(
     socket, 

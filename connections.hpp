@@ -98,6 +98,8 @@ class TCPConnection : public Connection {
 public:
   TCPConnection(boost::asio::io_context&, std::string&, std::string&);
 
+  TCPConnection(boost::asio::ip::tcp::socket&&);
+
   void write(Buffer&) override;
 
   void close() override;
