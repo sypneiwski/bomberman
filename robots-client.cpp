@@ -8,7 +8,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
-#include <cassert>
 #include "program_options.hpp"
 #include "messages.hpp"
 #include "connections.hpp"
@@ -40,7 +39,8 @@ namespace {
     // Helper function to find all squares on the map
     // that have exploded in the current event.
     void calculate_explosions(const Event &event, ClientToGUI& out) {
-      assert(event.type == EventType::BombExploded);
+      if (event.type != EventType::BombExploded)
+        throw std::runtime_error("Something went wrong");
       static std::vector<std::pair<int32_t,int32_t>> sides = {
         {1,0}, {0,1}, {-1, 0}, {0, -1}
       };
