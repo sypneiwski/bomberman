@@ -65,8 +65,8 @@ namespace {
     void process_events(
       const std::vector<Event> &events,
       ClientToGUI& out,
-      std::set<Player::PlayerId> &destroyed_players,
-      std::set<Position> &destroyed_blocks
+      std::set<Player::PlayerId> &robots_destroyed,
+      std::set<Position> &blocks_destroyed
       ) {
       for (const Event &event : events) {
         switch (event.type) {
@@ -76,10 +76,10 @@ namespace {
             break;
           case EventType::BombExploded:
             calculate_explosions(event, out);
-            for (const Position &position : event.destroyed_blocks)
-              destroyed_blocks.insert(position);
-            for (const Player::PlayerId &id : event.destroyed_players)
-              destroyed_players.insert(id);
+            for (const Position &position : event.blocks_destroyed)
+              blocks_destroyed.insert(position);
+            for (const Player::PlayerId &id : event.robots_destroyed)
+              robots_destroyed.insert(id);
             out.bombs.erase(event.bomb_id);
             break;
           case EventType::PlayerMoved:
@@ -106,8 +106,8 @@ namespace {
       // The `out` message will statically hold all information
       // about the game state that gui will use.
       static ClientToGUI out;
-      static std::set<Player::PlayerId> destroyed_players;
-      static std::set<Position> destroyed_blocks;
+      static std::set<Player::PlayerId> robots_destroyed;
+      static std::set<Position> blocks_destroyed;
       // Guards access to the game_state variable.
       const std::lock_guard<std::mutex> lock(state_mutex);
 
@@ -137,8 +137,8 @@ namespace {
           break;
         case ServerToClientType::Turn:
           out.explosions.clear();
-          destroyed_players.clear();
-          destroyed_blocks.clear();
+          robots_destroyed.clear();
+          blocks_destroyed.clear();
           out.turn = in.turn;
 
           // Decrease bomb timers
@@ -146,13 +146,13 @@ namespace {
             bomb.timer--;
 
           // Process this turn's events.
-          process_events(in.events, out, destroyed_players, destroyed_blocks);
+          process_events(in.events, out, robots_destroyed, blocks_destroyed);
 
           // Calculate the scores for this turn and erase destroyed
           // blocks.
-          for (const Position &position : destroyed_blocks)
+          for (const Position &position : blocks_destroyed)
             out.blocks.erase(position);
-          for (const Player::PlayerId &id : destroyed_players)
+          for (const Player::PlayerId &id : robots_destroyed)
             out.scores[id]++;
           break;
         case ServerToClientType::GameEnded:

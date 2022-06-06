@@ -26,6 +26,9 @@ namespace {
 
   void handle_client(tcp::socket &&socket) {
     TCPConnection client_connection(std::move(socket));
+    ServerToClient out;
+
+    
     std::cout << "succeeded\n";
   }
 

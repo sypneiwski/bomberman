@@ -6,7 +6,7 @@
 bool Position::operator<(const Position &other) const {
   if (x == other.x)
     return y < other.y;
-  return x < other.x;	
+  return x < other.x;
 }
 
 Position::Position(uint16_t x, uint16_t y) : x(x), y(y) {}
@@ -34,7 +34,7 @@ void Player::serialize(Buffer &buff) const {
       .write_string(address);
 }
 
-Bomb::Bomb(Position position, uint16_t timer) 
+Bomb::Bomb(Position position, uint16_t timer)
 : position(position), timer(timer) {}
 
 void Bomb::serialize(Buffer &buff) const {
@@ -52,7 +52,7 @@ void ClientToServer::serialize(Buffer &buff) const {
       buff.write8(static_cast<uint8_t>(direction));
       break;
     default:
-      break;		
+      break;
   }
 }
 
@@ -73,12 +73,12 @@ Event::Event(Connection &conn) {
       conn.read32(len);
       for (uint32_t i = 0; i < len; i++) {
         conn.read8(player_id);
-        destroyed_players.push_back(player_id);
+        robots_destroyed.push_back(player_id);
       }
       conn.read32(len);
       for (uint32_t i = 0; i < len; i++) {
         position = Position(conn);
-        destroyed_blocks.push_back(position);
+        blocks_destroyed.push_back(position);
       }
       break;
     case EventType::PlayerMoved:
@@ -91,13 +91,39 @@ Event::Event(Connection &conn) {
   }
 }
 
+void Event::serialize(Buffer& buff) const {
+  buff.write8(static_cast<uint8_t>(type));
+  switch (type) {
+    case EventType::BombPlaced:
+      buff.write32(bomb_id);
+      position.serialize(buff);
+      break;
+    case EventType::BombExploded:
+      buff.write32(bomb_id)
+          .write32((uint32_t) robots_destroyed.size());
+      for (const auto &id : robots_destroyed)
+        buff.write8(id);
+      buff.write32((uint32_t) blocks_destroyed.size());
+      for (const Position &position : blocks_destroyed)
+        position.serialize(buff);
+      break;
+    case EventType::PlayerMoved:
+      buff.write8(player_id);
+      position.serialize(buff);
+      break;
+    case EventType::BlockPlaced:
+      position.serialize(buff);
+      break;
+  }
+}
+
 ServerToClient::ServerToClient(Connection &conn) {
   uint8_t u8;
   conn.read8(u8);
   if (u8 > static_cast<uint8_t>(ServerToClientType::MAX))
     throw ServerReadError();
   type = ServerToClientType(u8);
-  uint32_t len;	
+  uint32_t len;
   switch (type) {
     case ServerToClientType::Hello:
       conn.read_string(server_name)
@@ -126,17 +152,55 @@ ServerToClient::ServerToClient(Connection &conn) {
       for (uint32_t i = 0; i < len; i++) {
         Event event(conn);
         events.push_back(event);
-      }	
+      }
       break;
     case ServerToClientType::GameEnded:
       conn.read32(len);
       for (uint32_t i = 0; i < len; i++) {
         Player::Score score;
         conn.read8(player_id)
-          .read32(score);
-        scores[player_id] = score;	
+            .read32(score);
+        scores[player_id] = score;
       }
       break;
+  }
+}
+
+void ServerToClient::serialize(Buffer& buff) const {
+  buff.write8(static_cast<uint8_t>(type));
+  switch (type) {
+    case ServerToClientType::Hello:
+      buff.write_string(server_name)
+          .write8(player_count)
+          .write16(size_x)
+          .write16(size_y)
+          .write16(game_length)
+          .write16(explosion_radius)
+          .write16(bomb_timer);
+      break;
+    case ServerToClientType::AcceptedPlayer:
+      buff.write8(player_id);
+      player.serialize(buff);
+      break;
+    case ServerToClientType::GameStarted:
+      buff.write32((uint32_t) players.size());
+      for (const auto &[id, player] : players) {
+        buff.write8(id);
+        player.serialize(buff);
+      }
+      break;
+    case ServerToClientType::Turn:
+      buff.write16(turn)
+          .write32((uint32_t) events.size());
+      for (const Event &event : events)
+        event.serialize(buff);
+      break;
+    case ServerToClientType::GameEnded:
+      buff.write32((uint32_t) scores.size());
+      for (const auto &[id, score] : scores) {
+        buff.write8(id)
+            .write32(score);
+      }
   }
 }
 
@@ -171,7 +235,7 @@ void ClientToGUI::serialize(Buffer &buff) const {
           .write16(bomb_timer)
           .write32((uint32_t) players.size());
       for (const auto &[id, player] : players) {
-        buff.write8(static_cast<uint8_t>(id));
+        buff.write8(id);
         player.serialize(buff);
       }
       break;
@@ -182,12 +246,12 @@ void ClientToGUI::serialize(Buffer &buff) const {
           .write16(turn)
           .write32((uint32_t) players.size());
       for (const auto &[id, player] : players) {
-        buff.write8(static_cast<uint8_t>(id));
+        buff.write8(id);
         player.serialize(buff);
       }
       buff.write32((uint32_t) player_positions.size());
       for (const auto &[id, position] : player_positions) {
-        buff.write8(static_cast<uint8_t>(id));
+        buff.write8(id);
         position.serialize(buff);
       }
       buff.write32((uint32_t) blocks.size());
@@ -201,8 +265,8 @@ void ClientToGUI::serialize(Buffer &buff) const {
         position.serialize(buff);
       buff.write32((uint32_t) scores.size());
       for (const auto &[id, score] : scores) {
-        buff.write8(static_cast<uint8_t>(id))
-            .write32(static_cast<uint32_t>(score));
-      }	
+        buff.write8(id)
+            .write32(score);
+      }
   }
 }

@@ -77,10 +77,12 @@ struct Event {
   Bomb::BombId bomb_id;
   Player::PlayerId player_id;
   Position position;
-  std::vector<Player::PlayerId> destroyed_players;
-  std::vector<Position> destroyed_blocks;
+  std::vector<Player::PlayerId> robots_destroyed;
+  std::vector<Position> blocks_destroyed;
 
+  Event() = default;
   Event(Connection&);
+  void serialize(Buffer&) const;
 };
 
 enum struct ServerToClientType : uint8_t {
@@ -103,7 +105,9 @@ struct ServerToClient {
   std::vector<Event> events;
   std::unordered_map<Player::PlayerId, Player::Score> scores;
 
+  ServerToClient() = default;
   ServerToClient(Connection&);
+  void serialize(Buffer&) const;
 };
 
 enum struct GUIToClientType : uint8_t {
