@@ -2,6 +2,8 @@
 #include <boost/asio.hpp>
 #include <thread>
 #include <vector>
+#include <conditional_variable>
+#include <map>
 #include "program_options.hpp"
 #include "messages.hpp"
 #include "connections.hpp"
@@ -16,7 +18,13 @@ namespace {
       Lobby = 0, Game = 1
     };
 
+    // Guards game state variables.
+    std::mutex server_mutex;
     GameState game_state{GameState::Lobby};
+    uint8_t current_id = 0;
+    std::conditional_variable new_players;
+    std::map<Player::PlayerId, Player> players;
+
     boost::asio::io_context io_context{};
     ServerOptions options;
     std::vector<std::thread> client_threads;
@@ -24,12 +32,46 @@ namespace {
     Server(ServerOptions &options) : options(options) {}
   };
 
-  void handle_client(tcp::socket &&socket) {
-    TCPConnection client_connection(std::move(socket));
+  struct Client {
+    TCPConnection conn;
+    std::string address;
+
+    Client(tcp::socket &&socket, std::string address) 
+    : conn(std::move(socket)),
+      address(address) {}
+  };
+
+  using ClientPtr = std::shared_ptr<Client>;
+  void send_to_client(Server &server, ClientPtr client) {
+    Buffer buffer;
     ServerToClient out;
 
-    
-    std::cout << "succeeded\n";
+    // Send hello message.
+    out.type = ServerToClientType::Hello;
+    out.server_name = server.options.server_name;
+    out.player_count = server.options.players_count;
+    out.size_x = server.options.size_x;
+    out.size_y = server.options.size_y;
+    out.game_length = server.options.game_length;
+    out.explosion_radius = server.options.explosion_radius;
+    out.bomb_timer = server.options.bomb_timer;
+    out.serialize(buffer);
+    client->conn.write(buffer);
+
+    std::unique_lock lock(server.state_mutex);
+    // send all accepted players
+    while (server.current_id < server.options.players_count) {
+      uint8_t current_id = server.current_id;
+      cv.wait(lock, []{return server.current_id != current_id});
+      // send new accepted player
+    }
+  }
+
+  void receive_from_client(Server &server, ClientPtr client) {
+    for (;;) {
+      ClientToServer in(client->conn);
+      std::cout << server.options.players_count << "\n";
+    }
   }
 
   void accept_new_connections(Server &server) {
@@ -40,10 +82,23 @@ namespace {
     for (;;) {
       tcp::socket socket(server.io_context);
       acc.accept(socket);
-      std::cout << "received connection!\n";
+      std::ostringstream client_address;
+      client_address << socket.remote_endpoint();
+      ClientPtr client = std::make_shared<Client>(
+        std::move(socket),
+        client_address.str()
+      );
+
+      std::cout << "received connection from " + client_address.str() + "!\n";
       server.client_threads.push_back(std::thread(
-        handle_client,
-        std::move(socket)
+        send_to_client,
+        std::ref(server),
+        client
+      ));
+      server.client_threads.push_back(std::thread(
+        receive_from_client,
+        std::ref(server),
+        client
       ));
     }
   }

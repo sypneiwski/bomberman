@@ -42,6 +42,27 @@ void Bomb::serialize(Buffer &buff) const {
   buff.write16(timer);
 }
 
+ClientToServer::ClientToServer(Connection &conn) {
+  uint8_t u8;
+  conn.read8(u8);
+  if (u8 > static_cast<uint8_t>(ClientToServerType::MAX))
+    throw ClientReadError();
+  type = ClientToServerType(u8);
+  switch (type) {
+    case ClientToServerType::Join:
+      conn.read_string(name);
+      break;
+    case ClientToServerType::Move:
+      conn.read8(u8);
+      if (u8 > static_cast<uint8_t>(Direction::MAX))
+        throw ServerReadError();
+      direction = Direction(u8);
+      break;
+    default:
+      break;
+  }
+}
+
 void ClientToServer::serialize(Buffer &buff) const {
   buff.write8(static_cast<uint8_t>(type));
   switch (type) {

@@ -9,12 +9,20 @@
 
 // This file includes declarations for structures used for
 // serializing and deserializing messages.
+
 class GUIReadError : public std::exception {};
 
 class ServerReadError : public std::exception {
 public:
   const char * what () const throw () {
-    return "Unable to parse message";
+    return "Unable to parse message from server";
+  }
+};
+
+class ClientReadError : public std::exception {
+public:
+  const char * what () const throw () {
+    return "Unable to parse message from client";
   }
 };
 
@@ -64,6 +72,7 @@ struct ClientToServer {
   Direction direction;
 
   ClientToServer() = default;
+  ClientToServer(Connection&);
   void serialize(Buffer&) const;
 };
 
