@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <exception>
-#include <unordered_map>
+#include <map>
 #include <set>
 #include "connections.hpp"
 
@@ -109,10 +109,10 @@ struct ServerToClient {
   uint16_t explosion_radius, bomb_timer;
   Player::PlayerId player_id;
   Player player;
-  std::unordered_map<Player::PlayerId, Player> players;
+  std::map<Player::PlayerId, Player> players;
   uint16_t turn;
   std::vector<Event> events;
-  std::unordered_map<Player::PlayerId, Player::Score> scores;
+  std::map<Player::PlayerId, Player::Score> scores;
 
   ServerToClient() = default;
   ServerToClient(Connection&);
@@ -143,13 +143,13 @@ struct ClientToGUI {
   uint16_t size_x, size_y;
   uint16_t game_length;
   uint16_t explosion_radius, bomb_timer;
-  std::unordered_map<Player::PlayerId, Player> players;
+  std::map<Player::PlayerId, Player> players;
   uint16_t turn;
-  std::unordered_map<Player::PlayerId, Position> player_positions;
+  std::map<Player::PlayerId, Position> player_positions;
   std::set<Position> blocks;
-  std::unordered_map<Bomb::BombId, Bomb> bombs;
+  std::map<Bomb::BombId, Bomb> bombs;
   std::set<Position> explosions;
-  std::unordered_map<Player::PlayerId, Player::Score> scores;
+  std::map<Player::PlayerId, Player::Score> scores;
 
   ClientToGUI() = default;
   void serialize(Buffer&) const;

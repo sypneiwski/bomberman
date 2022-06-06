@@ -2,7 +2,7 @@
 #include <boost/asio.hpp>
 #include <thread>
 #include <vector>
-#include <conditional_variable>
+#include <condition_variable>
 #include <map>
 #include "program_options.hpp"
 #include "messages.hpp"
@@ -22,7 +22,7 @@ namespace {
     std::mutex server_mutex;
     GameState game_state{GameState::Lobby};
     uint8_t current_id = 0;
-    std::conditional_variable new_players;
+    std::condition_variable new_players, game_start;
     std::map<Player::PlayerId, Player> players;
 
     boost::asio::io_context io_context{};
@@ -30,15 +30,29 @@ namespace {
     std::vector<std::thread> client_threads;
 
     Server(ServerOptions &options) : options(options) {}
+
+    void add_player(std::string name, std::string address) {
+      if (game_state == GameState::Game)
+        throw std::runtime_error("Something went wrong");
+      std::unique_lock lock(server_mutex);
+      players[current_id++] = Player(name, address);
+      std::cout << "players now at " << (int)current_id << "\n";
+      if (current_id == options.players_count) {
+        game_state = GameState::Game;
+        game_start.notify_all();
+      }
+    }
   };
 
   struct Client {
     TCPConnection conn;
     std::string address;
+    uint32_t id;
 
-    Client(tcp::socket &&socket, std::string address) 
+    Client(tcp::socket &&socket, std::string address, uint32_t id) 
     : conn(std::move(socket)),
-      address(address) {}
+      address(address),
+      id(id) {}
   };
 
   using ClientPtr = std::shared_ptr<Client>;
@@ -57,24 +71,62 @@ namespace {
     out.bomb_timer = server.options.bomb_timer;
     out.serialize(buffer);
     client->conn.write(buffer);
+    std::cout << "Sent hello message\n";
 
-    std::unique_lock lock(server.state_mutex);
-    // send all accepted players
-    while (server.current_id < server.options.players_count) {
-      uint8_t current_id = server.current_id;
-      cv.wait(lock, []{return server.current_id != current_id});
-      // send new accepted player
+    std::unique_lock lock(server.server_mutex);
+    out.type = ServerToClientType::AcceptedPlayer;
+    // Send accepted player messages.
+    uint8_t current_id = 0;
+    for (; current_id < server.current_id; current_id++) {
+      out.player_id = current_id;
+      out.player = server.players[current_id];
+      out.serialize(buffer);
+      client->conn.write(buffer);
+      std::cout << "sent accepted player\n";
     }
+    while (server.current_id < server.options.players_count) {
+      server.new_players.wait(
+        lock,
+        [&]{return server.current_id != current_id;}
+      );
+      // Send new accepted players.
+      for (; current_id < server.current_id; current_id++) {
+        out.player_id = current_id;
+        out.player = server.players[current_id];
+        out.serialize(buffer);
+        client->conn.write(buffer);
+        std::cout << "sent accepted player\n";
+      }
+    }
+    server.game_start.wait(
+      lock,
+      [&]{return server.game_state == Server::GameState::Game;}
+    );
+    // Sending game started.
+    out.type = ServerToClientType::GameStarted;
+    out.players = server.players;
+    out.serialize(buffer);
+    client->conn.write(buffer);
+    std::cout << "sent game started!\n";
   }
 
   void receive_from_client(Server &server, ClientPtr client) {
     for (;;) {
       ClientToServer in(client->conn);
-      std::cout << server.options.players_count << "\n";
+      switch (in.type) {
+        case ClientToServerType::Join:
+          std::cout << "received join message\n";
+          server.add_player(in.name, client->address);
+          server.new_players.notify_all();
+          break;
+        default:
+          break;
+      }
     }
   }
 
   void accept_new_connections(Server &server) {
+    static uint32_t id = 0;
     tcp::acceptor acc(
       server.io_context,
       tcp::endpoint(tcp::v6(), server.options.port)
@@ -86,10 +138,11 @@ namespace {
       client_address << socket.remote_endpoint();
       ClientPtr client = std::make_shared<Client>(
         std::move(socket),
-        client_address.str()
+        client_address.str(),
+        id++
       );
 
-      std::cout << "received connection from " + client_address.str() + "!\n";
+      std::cout << "accepted connection from " + client_address.str() + "!\n";
       server.client_threads.push_back(std::thread(
         send_to_client,
         std::ref(server),
