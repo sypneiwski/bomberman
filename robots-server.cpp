@@ -126,7 +126,7 @@ namespace {
   }
 
   void accept_new_connections(Server &server) {
-    static uint32_t id = 0;
+    uint32_t id = 0;
     tcp::acceptor acc(
       server.io_context,
       tcp::endpoint(tcp::v6(), server.options.port)
