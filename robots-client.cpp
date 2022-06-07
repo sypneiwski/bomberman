@@ -23,7 +23,6 @@ namespace {
   // of the game.
   class Client {
   private:
-    // Current game state.
     enum struct GameState {
       Lobby = 0, Game = 1
     };
