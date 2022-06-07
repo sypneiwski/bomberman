@@ -12,17 +12,12 @@
 
 class GUIReadError : public std::exception {};
 
+class ClientReadError : public std::exception {};
+
 class ServerReadError : public std::exception {
 public:
   const char * what () const throw () {
     return "Unable to parse message from server";
-  }
-};
-
-class ClientReadError : public std::exception {
-public:
-  const char * what () const throw () {
-    return "Unable to parse message from client";
   }
 };
 
