@@ -2,7 +2,6 @@
 #include <string>
 #include <exception>
 #include <boost/asio.hpp>
-#include <optional>
 #include <set>
 #include <utility>
 #include <mutex>
