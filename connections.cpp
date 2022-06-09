@@ -31,7 +31,7 @@ Buffer &Buffer::write32(uint32_t number) {
 Buffer &Buffer::write_string(std::string buffer) {
   uint8_t len = (uint8_t) buffer.size();
   write8(len);
-  data.insert(data.end(), buffer.c_str(), len);
+  data.insert(data.end(), buffer.c_str(), buffer.c_str() + len);
   return *this;
 }
 
