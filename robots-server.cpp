@@ -445,8 +445,6 @@ namespace {
           current_events.clear();
           debug("[Game Handler] Turn processed");
         }
-        if (turn == server.options.game_length)
-          break;
 
         for (uint8_t id = 0; id < server.options.players_count; id++) {
           std::unique_lock player_lock(server.player_moves_mutex[id]);
@@ -455,6 +453,8 @@ namespace {
         }
 
         server.new_turn.notify_all();
+        if (turn == server.options.game_length)
+          break;
         std::this_thread::sleep_for(std::chrono::milliseconds(
           server.options.turn_duration
         ));
