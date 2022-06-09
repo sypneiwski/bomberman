@@ -195,7 +195,7 @@ namespace {
             out.type = ClientToServerType::PlaceBomb;
             break;
           case GUIToClientType::PlaceBlock:
-            debug("Received PlaceBlock from GUI")
+            debug("Received PlaceBlock from GUI");
             out.type = ClientToServerType::PlaceBlock;
             break;
           case GUIToClientType::Move:
