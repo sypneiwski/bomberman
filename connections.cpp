@@ -5,8 +5,6 @@
 #include <endian.h>
 #include "connections.hpp"
 
-Buffer::Buffer() : ptr(data), end(data + BUFFER_SIZE) {}
-
 template<typename T>
 void Buffer::write(T number) {
   uint8_t *ptr = (uint8_t *) &number; 

@@ -11,9 +11,9 @@
 // The writeX functions convert binary numbers to network order.
 class Buffer {
 public: 
-  std::vector<uint8_t> data;
+  std::vector<uint8_t> data{};
 
-  Buffer();
+  Buffer() = default;
 
   Buffer &write8(uint8_t);
 
