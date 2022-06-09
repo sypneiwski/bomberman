@@ -13,8 +13,6 @@ class Buffer {
 public: 
   std::vector<uint8_t> data{};
 
-  Buffer() = default;
-
   Buffer &write8(uint8_t);
 
   Buffer &write16(uint16_t);
