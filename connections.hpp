@@ -7,19 +7,12 @@
 #include <boost/asio.hpp>
 #include <endian.h>
 
-class BufferError : public std::exception {
-public:
-  const char * what () const throw () {
-    return "Buffer error.";
-  }
-};
-
 // Helper class for serializing outgoing messages.
 // The writeX functions convert binary numbers to network order.
 class Buffer {
-public:
-  static constexpr size_t BUFFER_SIZE = 65535;
-  
+public: 
+  std::vector<uint8_t> data;
+
   Buffer();
 
   Buffer &write8(uint8_t);
@@ -30,16 +23,9 @@ public:
 
   Buffer &write_string(std::string);
 
-  size_t size() const;
-
-  char* get_data();
-
   void clear();
 
 private:
-  char data[BUFFER_SIZE];
-  char *ptr, *end;
-
   template<typename T>
   void write(T);
 };

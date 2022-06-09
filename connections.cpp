@@ -9,10 +9,8 @@ Buffer::Buffer() : ptr(data), end(data + BUFFER_SIZE) {}
 
 template<typename T>
 void Buffer::write(T number) {
-  if (ptr + sizeof(T) > end)
-    throw BufferError();
-  *(T *) ptr = number;
-  ptr += sizeof(T);
+  uint8_t *ptr = (uint8_t *) &number; 
+  data.insert(data.end(), ptr, ptr + sizeof(T));
 }
 
 Buffer &Buffer::write8(uint8_t number) {
@@ -32,24 +30,13 @@ Buffer &Buffer::write32(uint32_t number) {
 
 Buffer &Buffer::write_string(std::string buffer) {
   uint8_t len = (uint8_t) buffer.size();
-  if (ptr + len > end)
-    throw BufferError();
   write8(len);
-  memcpy(ptr, buffer.c_str(), len);
-  ptr += len;
+  data.insert(data.end(), buffer.c_str(), len);
   return *this;
 }
 
-size_t Buffer::size() const {
-  return ptr - data;
-}
-
-char* Buffer::get_data() {
-  return data;
-}
-
 void Buffer::clear() {
-  ptr = data;
+  data.clear();
 }
 
 Connection& Connection::read8(uint8_t &number) {
@@ -101,7 +88,7 @@ UDPConnection::UDPConnection(
 
 void UDPConnection::write(Buffer &buffer) {
   socket.send_to(
-    boost::asio::buffer(buffer.get_data(), buffer.size()), 
+    boost::asio::buffer(buffer.data), 
     endpoint
   );
   buffer.clear();
@@ -157,7 +144,7 @@ TCPConnection::TCPConnection(tcp::socket &&socket)
 void TCPConnection::write(Buffer &buffer) {
   boost::asio::write(
     socket, 
-    boost::asio::buffer(buffer.get_data(), buffer.size())
+    boost::asio::buffer(buffer.data)
   );
   buffer.clear();
 }
