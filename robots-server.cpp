@@ -104,13 +104,13 @@ namespace {
 
   // Function for sending all messages to the client.
   void send_to_client(Server &server, ClientPtr client) {
-    for (;;) {
-      Buffer serialized;
-      ServerToClient out;
-      uint8_t current_id = 0;
-      uint16_t current_turn = 0;
+    try {
+      for (;;) {
+        Buffer serialized;
+        ServerToClient out;
+        uint8_t current_id = 0;
+        uint16_t current_turn = 0;
 
-      try {
         // Send hello message.
         out.type = ServerToClientType::Hello;
         out.server_name = server.options.server_name;
@@ -174,13 +174,13 @@ namespace {
         client->conn.write(serialized);
         debug("Sent game ended to client " + client->address);
       }
-      catch (std::exception &e) {
-        try {
-          client->conn.close();
-          debug("Closing connection with " + client->address);
-        }
-        catch (std::exception &e) {}
+    }
+    catch (std::exception &e) {
+      try {
+        client->conn.close();
+        debug("Closing connection with " + client->address);
       }
+      catch (std::exception &e) {}
     }
   }
 

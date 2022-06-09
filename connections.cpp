@@ -123,6 +123,9 @@ bool UDPConnection::has_more() const {
 }
 
 void UDPConnection::close() {
+  if (closed)
+    throw std::runtime_error("Connection already closed");
+  closed = true;
   boost::system::error_code ec;
   socket.shutdown(udp::socket::shutdown_both, ec);
   socket.close();

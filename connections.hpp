@@ -63,7 +63,7 @@ public:
 
 protected:
   bool closed{false};
-  
+
   virtual void read(void*, size_t) = 0;	
 };
 
