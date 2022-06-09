@@ -10,6 +10,7 @@
 #include "program_options.hpp"
 #include "messages.hpp"
 #include "connections.hpp"
+#include "misc.hpp"
 
 namespace {
   // Mutex and conditional variable used for safely closing
@@ -107,7 +108,8 @@ namespace {
       static std::set<Player::PlayerId> robots_destroyed;
       static std::set<Position> blocks_destroyed;
       // Guards access to the game_state variable.
-      const std::lock_guard<std::mutex> lock(state_mutex);
+      std::lock_guard<std::mutex> lock(state_mutex);
+      debug("Received message from server");
 
       switch (in.type) {
         case ServerToClientType::Hello:
@@ -173,7 +175,8 @@ namespace {
     ClientToServer& process_gui_message(const GUIToClient& in) {
       static ClientToServer out;
       // Guards access to the game state variable.
-      const std::lock_guard<std::mutex> lock(state_mutex);
+      std::lock_guard<std::mutex> lock(state_mutex);
+      debug("Received message from GUI");
 
       // If the game is in lobby state, send a JOIN
       // message to the server regardless of `in` type.
@@ -269,13 +272,14 @@ int main(int argc, char *argv[]) {
     // Starting to listen for messages.
     std::thread server_thread(server_messages_handler, std::ref(client));
     std::thread gui_thread(gui_messages_handler, std::ref(client));
+    debug("Listening for GUI messages on port " + std::to_string(options.port));
 
     // Waiting for any exceptions in the threads.
     std::unique_lock lock(end_mutex);
     end_condition.wait(lock, []{return end;});
     end_mutex.unlock();
 
-    std::cerr << "closing connection\n";
+    debug("Closing connection");
     client.close_sockets();
     server_thread.join();
     gui_thread.join();
