@@ -161,7 +161,10 @@ namespace {
             out.events = server.turns[current_turn];
             out.serialize(serialized);
             client->conn.write(serialized);
-            debug("Sent turn message to client " + client->address);
+            debug(
+              "Sent turn " + std::to_string(current_turn) +
+              " to client " + client->address
+            );
           }
         }
         //Sending game ended.
@@ -236,8 +239,9 @@ namespace {
         client_address.str()
       );
 
-      debug("[Acceptor] Accepted connection from client " + 
-            client_address.str()
+      debug(
+        "[Acceptor] Accepted connection from client " +
+        client_address.str()
       );
       // Start both client threads.
       std::thread sender(
@@ -443,7 +447,7 @@ namespace {
           server.current_turn++;
           server.turns.push_back(current_events);
           current_events.clear();
-          debug("[Game Handler] Turn processed");
+          debug("[Game Handler] Processed turn " + std::to_string(turn));
         }
 
         for (uint8_t id = 0; id < server.options.players_count; id++) {
@@ -470,8 +474,9 @@ namespace {
 int main(int argc, char *argv[]) {
   try {
     ServerOptions options = ServerOptions(argc, argv);
-    debug("[Server] Listening for clients on port " + 
-          std::to_string(options.port)
+    debug(
+      "[Server] Listening for clients on port " +
+      std::to_string(options.port)
     );
     Server server(options);
     std::thread game_handler(handle_game, std::ref(server));
