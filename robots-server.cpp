@@ -69,6 +69,8 @@ namespace {
       // If enough players joined, start game.
       if (current_id == options.players_count) {
         game_state = GameState::Game;
+        current_turn = 0;
+        turns.clear();
         for (uint8_t id = 0; id < options.players_count; id++)
           scores[id] = 0;
         // Alert game handler.
@@ -85,8 +87,6 @@ namespace {
       iteration++;
       current_id = 0;
       players.clear();
-      current_turn = 0;
-      turns.clear();
     }
   };
 
