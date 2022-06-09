@@ -109,10 +109,10 @@ namespace {
       static std::set<Position> blocks_destroyed;
       // Guards access to the game_state variable.
       std::lock_guard<std::mutex> lock(state_mutex);
-      debug("Received message from server");
 
       switch (in.type) {
         case ServerToClientType::Hello:
+          debug("Received Hello from server");
           out.server_name = in.server_name;
           out.player_count = in.player_count;
           out.size_x = in.size_x;
@@ -122,10 +122,12 @@ namespace {
           out.bomb_timer = in.bomb_timer;
           break;
         case ServerToClientType::AcceptedPlayer:
+          debug("Received Accepted Player from server");
           out.players[in.player_id] = in.player;
           out.scores[in.player_id] = 0;
           break;
         case ServerToClientType::GameStarted:
+          debug("Received Game Started from server");
           game_state = GameState::Game;
           out.players = in.players;
           out.scores.clear();
@@ -136,6 +138,7 @@ namespace {
           out.bombs.clear();
           break;
         case ServerToClientType::Turn:
+          debug("Received Turn from server");
           out.explosions.clear();
           robots_destroyed.clear();
           blocks_destroyed.clear();
@@ -156,6 +159,7 @@ namespace {
             out.scores[id]++;
           break;
         case ServerToClientType::GameEnded:
+          debug("Received Game Ended from server");
           game_state = GameState::Lobby;
           out.players.clear();
           out.scores.clear();
@@ -176,23 +180,26 @@ namespace {
       static ClientToServer out;
       // Guards access to the game state variable.
       std::lock_guard<std::mutex> lock(state_mutex);
-      debug("Received message from GUI");
 
       // If the game is in lobby state, send a JOIN
       // message to the server regardless of `in` type.
       if (game_state == GameState::Lobby) {
+        debug("Received Join from GUI");
         out.type = ClientToServerType::Join;
         out.name = player_name;
       }
       else {
         switch (in.type) {
           case GUIToClientType::PlaceBomb:
+            debug("Received PlaceBomb from GUI");
             out.type = ClientToServerType::PlaceBomb;
             break;
           case GUIToClientType::PlaceBlock:
+            debug("Received PlaceBlock from GUI")
             out.type = ClientToServerType::PlaceBlock;
             break;
           case GUIToClientType::Move:
+            debug("Received Move from GUI");
             out.type = ClientToServerType::Move;
             out.direction = in.direction;
             break;
