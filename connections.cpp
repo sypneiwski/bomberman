@@ -164,5 +164,8 @@ void TCPConnection::read(void* buffer, size_t size) {
 }
 
 void TCPConnection::close() {
+  if (closed)
+    throw std::runtime_error("Connection already closed")
+  closed = true;
   socket.close();
 }

@@ -62,6 +62,8 @@ public:
   virtual void close() = 0;
 
 protected:
+  bool closed{false};
+  
   virtual void read(void*, size_t) = 0;	
 };
 
