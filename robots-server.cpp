@@ -176,7 +176,8 @@ namespace {
       }
       catch (std::exception &e) {
         try {
-        client->conn.close();
+          client->conn.close();
+          debug("Closing connection with " + std::to_string(client->address));
         }
         catch (std::exception &e) {}
       }
@@ -217,7 +218,8 @@ namespace {
     }
     catch (std::exception &e) {
       try {
-      client->conn.close();
+        client->conn.close();
+        debug("Closing connection with " + std::to_string(client->address));
       }
       catch (std::exception &e) {}
     }
