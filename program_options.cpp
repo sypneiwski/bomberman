@@ -27,7 +27,7 @@ template<typename T>
 void bound_check(
   int64_t value,
   T &option,
-  std::string name,
+  std::string &name,
   bool non_zero = true
   ) {
   if (value < (int64_t) non_zero || value > std::numeric_limits<T>::max())
@@ -98,15 +98,15 @@ ServerOptions::ServerOptions(int argc, char* argv[]) {
   }
   po::notify(vm);
 
-  bound_check(bomb_timer_, bomb_timer, std::string("bomb timer"));
-  bound_check(players_count_, players_count, std::string("players count"));
-  bound_check(explosion_radius_, explosion_radius, std::string("explosion radius"), false);
-  bound_check(initial_blocks_, initial_blocks, std::string("initial blocks"), false);
-  bound_check(game_length_, game_length, std::string("game length"));
-  bound_check(port_, port, std::string("port"));
-  bound_check(seed_, seed, std::string("seed"));
-  bound_check(size_x_, size_x, std::string("size x"));
-  bound_check(size_y_, size_y, std::string("size y"));
+  bound_check(bomb_timer_, bomb_timer, "bomb timer");
+  bound_check(players_count_, players_count, "players count");
+  bound_check(explosion_radius_, explosion_radius, "explosion radius", false);
+  bound_check(initial_blocks_, initial_blocks, "initial blocks", false);
+  bound_check(game_length_, game_length, "game length");
+  bound_check(port_, port, "port");
+  bound_check(seed_, seed, "seed", false);
+  bound_check(size_x_, size_x, "size x");
+  bound_check(size_y_, size_y, "size y");
   if (turn_duration_ <= 0)
     throw OptionsError("Please provide a valid turn duration value");
   turn_duration = turn_duration_;  
