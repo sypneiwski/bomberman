@@ -328,10 +328,9 @@ namespace {
       if (robots_destroyed.contains(id)) {
         event.type = EventType::PlayerMoved;
         event.player_id = id;
-        event.position = Position(
-          (uint16_t) random() % server.options.size_x,
-          (uint16_t) random() % server.options.size_y
-        );
+        uint16_t x = uint16_t(server.random() % server.options.size_x),
+                 y = uint16_t(server.random() % server.options.size_y);
+        event.position = Position(x, y);
         server.player_positions[id] = event.position;
         current_events.push_back(event);
         server.scores[id]++;
@@ -424,20 +423,18 @@ namespace {
         Event event;
         event.type = EventType::PlayerMoved;
         event.player_id = id;
-        event.position = Position(
-          (uint16_t) random() % server.options.size_x,
-          (uint16_t) random() % server.options.size_y
-        );
+        uint16_t x = uint16_t(server.random() % server.options.size_x),
+                 y = uint16_t(server.random() % server.options.size_y);
+        event.position = Position(x, y);
         server.player_positions[id] = event.position;
         current_events.push_back(event);
       }
       for (uint16_t i = 0; i < server.options.initial_blocks; i++) {
         Event event;
         event.type = EventType::BlockPlaced;
-        event.position = Position(
-          (uint16_t) random() % server.options.size_x,
-          (uint16_t) random() % server.options.size_y
-        );
+        uint16_t x = uint16_t(server.random() % server.options.size_x),
+                 y = uint16_t(server.random() % server.options.size_y);
+        event.position = Position(x, y);
         // Check if there was already a block at this position.
         if (server.blocks.insert(event.position).second)
           current_events.push_back(event);
