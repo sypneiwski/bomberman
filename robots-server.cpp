@@ -44,7 +44,7 @@ namespace {
 
     // Variables for client connections handling.
     std::mutex moves_mutex;
-    std::map<Player::PlayerId, ClientToServer> player moves{};
+    std::map<Player::PlayerId, ClientToServer> player_moves{};
 
     Server(ServerOptions &options) 
     : options(options),
@@ -392,7 +392,7 @@ namespace {
             }
             break;
             }
-          case default:
+          default:
             throw std::runtime_error("Something went wrong");
         } 
       }
