@@ -27,7 +27,7 @@ template<typename T>
 void bound_check(
   int64_t value,
   T &option,
-  std::string &name,
+  const std::string &name,
   bool non_zero = true
   ) {
   if (value < (int64_t) non_zero || value > std::numeric_limits<T>::max())
