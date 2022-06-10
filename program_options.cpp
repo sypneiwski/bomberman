@@ -67,8 +67,8 @@ ClientOptions::ClientOptions(int argc, char* argv[]) {
 ServerOptions::ServerOptions(int argc, char* argv[]) {
   namespace po = boost::program_options;
   po::options_description desc("Allowed options");
-  int64_t bomb_timer_, players_count_, turn_duration_,
-          explosion_radius_, initial_blocks_, game_length_,
+  int64_t bomb_timer_, players_count_, explosion_radius_,
+          initial_blocks_, game_length_,
           port_, seed_, size_x_, size_y_;
   seed = static_cast<uint32_t>(
     std::chrono::system_clock::now().time_since_epoch().count()
@@ -77,7 +77,7 @@ ServerOptions::ServerOptions(int argc, char* argv[]) {
   desc.add_options()
     ("bomb-timer,b", po::value<int64_t>(&bomb_timer_)->required(), "bomb timer")
     ("players-count,c", po::value<int64_t>(&players_count_)->required(), "players count")
-    ("turn-duration,d", po::value<int64_t>(&turn_duration_)->required(), "turn duration")
+    ("turn-duration,d", po::value<uint64_t>(&turn_duration)->required(), "turn duration")
     ("explosion-radius,e", po::value<int64_t>(&explosion_radius_)->required(), "explosion radius")
     ("help,h", "produce help message")
     ("initial-blocks,k", po::value<int64_t>(&initial_blocks_)->required(), "initial blocks")
@@ -107,7 +107,4 @@ ServerOptions::ServerOptions(int argc, char* argv[]) {
   bound_check(seed_, seed, "seed", false);
   bound_check(size_x_, size_x, "size x");
   bound_check(size_y_, size_y, "size y");
-  if (turn_duration_ <= 0)
-    throw OptionsError("Please provide a valid turn duration value");
-  turn_duration = turn_duration_;  
 }
