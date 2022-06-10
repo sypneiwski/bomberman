@@ -24,8 +24,13 @@ bool resolve_address(
 
 // Function checks if the provided value of an options is valid.
 template<typename T>
-void bound_check(int64_t value, T &option, std::string name) {
-  if (value <= 0 || value > std::numeric_limits<T>::max())
+void bound_check(
+  int64_t value,
+  T &option,
+  std::string name,
+  bool non_zero = true
+  ) {
+  if (value < (int64_t) non_zero || value > std::numeric_limits<T>::max())
     throw OptionsError("Please provide a valid " + name + " value");
   option = (T) value;  
 }
@@ -94,9 +99,9 @@ ServerOptions::ServerOptions(int argc, char* argv[]) {
   po::notify(vm);
 
   bound_check(bomb_timer_, bomb_timer, std::string("bomb timer"));
-  bound_check(players_count_, players_count, std::string("players count"));  
-  bound_check(explosion_radius_, explosion_radius, std::string("explosion radius"));
-  bound_check(initial_blocks_, initial_blocks, std::string("initial blocks"));
+  bound_check(players_count_, players_count, std::string("players count"));
+  bound_check(explosion_radius_, explosion_radius, std::string("explosion radius"), false);
+  bound_check(initial_blocks_, initial_blocks, std::string("initial blocks"), false);
   bound_check(game_length_, game_length, std::string("game length"));
   bound_check(port_, port, std::string("port"));
   bound_check(seed_, seed, std::string("seed"));
