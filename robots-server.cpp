@@ -43,14 +43,12 @@ namespace {
     uint32_t iteration{0};
 
     // Variables for client connections handling.
-    std::vector<std::mutex> player_moves_mutex;
-    std::vector<ClientToServer> player_moves;
+    std::mutex moves_mutex;
+    std::map<Player::PlayerId, ClientToServer> player moves{};
 
     Server(ServerOptions &options) 
     : options(options),
-      random(options.seed),
-      player_moves_mutex((size_t) options.players_count),
-      player_moves((size_t) options.players_count) {}
+      random(options.seed) {}
 
     // Function for adding joining players during Lobby state.
     bool add_player(std::string name, std::string address, uint8_t &id) {
@@ -210,7 +208,7 @@ namespace {
           default:
             if (!joined)
               break;
-            std::unique_lock lock(server.player_moves_mutex[id]);
+            std::unique_lock lock(server.moves_mutex);
             server.player_moves[id] = in;
             break;
         }
@@ -336,9 +334,11 @@ namespace {
         server.scores[id]++;
       }
       else {
-        std::unique_lock player_lock(server.player_moves_mutex[id]);
+        std::unique_lock moves_lock(server.moves_mutex);
+        if (!server.player_moves.contains(id))
+          continue;
         ClientToServer move = server.player_moves[id];
-        player_lock.unlock();
+        moves_lock.unlock();
 
         switch (move.type) {
           case ClientToServerType::PlaceBomb:
@@ -392,9 +392,8 @@ namespace {
             }
             break;
             }
-          case ClientToServerType::Join:
-            // Player did not send a move this turn.
-            break;
+          case default:
+            throw std::runtime_error("Something went wrong");
         } 
       }
     }
@@ -449,10 +448,9 @@ namespace {
           debug("[Game Handler] Processed turn " + std::to_string(turn));
         }
 
-        for (uint8_t id = 0; id < server.options.players_count; id++) {
-          std::unique_lock player_lock(server.player_moves_mutex[id]);
-          // Resets requested player moves.
-          server.player_moves[id] = ClientToServer();
+        {
+          std::unique_lock moves_lock(server.moves_mutex);
+          server.player_moves.clear();
         }
 
         server.new_turn.notify_all();
