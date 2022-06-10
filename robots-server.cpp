@@ -229,33 +229,39 @@ namespace {
       tcp::endpoint(tcp::v6(), server.options.port)
     );
     for (;;) {
-      tcp::socket socket(server.io_context);
-      acceptor.accept(socket);
-      socket.set_option(tcp::no_delay(true));
-      std::ostringstream client_address;
-      client_address << socket.remote_endpoint();
-      ClientPtr client = std::make_shared<Client>(
-        std::move(socket),
-        client_address.str()
-      );
+      try {
+        tcp::socket socket(server.io_context);
+        acceptor.accept(socket);
+        socket.set_option(tcp::no_delay(true));
+        std::ostringstream client_address;
+        client_address << socket.remote_endpoint();
+        ClientPtr client = std::make_shared<Client>(
+          std::move(socket),
+          client_address.str()
+        );
 
-      debug(
-        "[Acceptor] Accepted connection from client " +
-        client_address.str()
-      );
-      // Start both client threads.
-      std::thread sender(
-        send_to_client,
-        std::ref(server),
-        client
-      );
-      std::thread receiver(
-        receive_from_client,
-        std::ref(server),
-        client
-      );
-      sender.detach();
-      receiver.detach();
+        debug(
+          "[Acceptor] Accepted connection from client " +
+          client_address.str()
+        );
+        // Start both client threads.
+        std::thread sender(
+          send_to_client,
+          std::ref(server),
+          client
+        );
+        std::thread receiver(
+          receive_from_client,
+          std::ref(server),
+          client
+        );
+        sender.detach();
+        receiver.detach();
+      }
+      catch (std::exception &e) {
+        // In case accepting fails because of network problems.
+        continue;
+      }
     }
   }
 
